@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { PixcallTagger } from "./api";
+import { BaseDirectory, open as openFile } from "@tauri-apps/plugin-fs";
+
 // @ts-ignore
 import {
 	lightTheme,
@@ -63,9 +65,7 @@ async function selectRepoPath() {
 
 	// 获取文件夹列表
 	try {
-		console.log(formData.value.repoPath);
 		const folders = await invoke<[string, string][]>("get_folders", { repoPath: formData.value.repoPath });
-		console.log(folders);
 		folderOptions.value = folders.map(([id, name]) => ({
 			label: name,
 			value: id,
@@ -121,25 +121,64 @@ async function tagImages() {
 		return;
 	} */
 
-	/* try { */
-	message.info("开始打标，请稍候...");
-	const [image_id, thumb_hash] = await api.get_selected_images();
-	const all_tags_map = await api.get_all_tags();
-	console.log(thumb_hash);
-	const tags = (await invoke("tag_images", {
-		thumbHash: thumb_hash,
-		tagPath: "E:\\KANKAN\\tools\\eagle_tagger\\tagger\\models\\wd-eva02-large-tagger-v3\\selected_tags.csv",
-		modelPath: "E:\\KANKAN\\tools\\eagle_tagger\\tagger\\models\\wd-eva02-large-tagger-v3\\model.onnx",
-	})) as string[][];
-	for (let i = 0; i < thumb_hash.length; i++) {
-		const tag_id = await api.write_nonexist(tags[i], all_tags_map);
-		console.log(tag_id);
-		await api.write_image_tags(image_id[i], tag_id);
-	}
-	message.success("打标完成！");
-	/* } catch (error) {
+	try {
+		message.info("开始打标，请稍候...");
+		const [image_id, thumb_hash] = await api.get_selected_images();
+		const all_tags_map = await api.get_all_tags();
+		const tags = (await invoke("tag_images", {
+			thumbHash: thumb_hash,
+			tagPath: "E:\\KANKAN\\tools\\eagle_tagger\\tagger\\models\\wd-eva02-large-tagger-v3\\selected_tags.csv",
+			modelPath: "E:\\KANKAN\\tools\\eagle_tagger\\tagger\\models\\wd-eva02-large-tagger-v3\\model.onnx",
+		})) as string[][];
+		for (let i = 0; i < thumb_hash.length; i++) {
+			const tag_id = await api.write_nonexist(tags[i], all_tags_map);
+			await api.write_image_tags(image_id[i], tag_id);
+		}
+		message.success("打标完成！");
+	} catch (error) {
 		message.error("打标失败: " + error);
-	} */
+	}
+}
+
+async function downloadFilePureFrontend(url: string, fileName: string) {
+	const file = await openFile(fileName, {
+		append: true,
+		create: true,
+		write: true,
+		baseDir: BaseDirectory.Resource,
+	});
+
+	try {
+		// 1. 发起 Fetch 请求
+		const response = await fetch(url);
+		if (!response.ok) throw new Error("下载失败");
+		// 2. 获取文件大小（用于进度计算）
+		const contentLength = response.headers.get("content-length");
+		const totalBytes = contentLength ? parseInt(contentLength) : 0;
+		let receivedBytes = 0;
+		// 3. 读取流数据并监听进度
+		const reader = response.body?.getReader();
+		if (!reader) throw new Error("无法读取数据流");
+		//const chunks: Uint8Array[] = [];
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			//chunks.push(value);
+			await file.write(value);
+			receivedBytes += value.length;
+			// 计算并显示进度（可选）
+			if (totalBytes > 0) {
+				const percent = Math.round((receivedBytes / totalBytes) * 100);
+				console.log(`下载进度: ${percent}%`);
+				// 更新 UI 进度条（示例）
+			}
+		}
+		alert(`文件已保存到下载文件夹: ${fileName}`);
+	} catch (error) {
+		console.error("下载失败:", error);
+		alert("下载失败，请检查链接或网络！");
+	}
+	file.close();
 }
 </script>
 

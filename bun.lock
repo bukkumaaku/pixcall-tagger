@@ -6,8 +6,10 @@
       "dependencies": {
         "@tauri-apps/api": "^2.5.0",
         "@tauri-apps/plugin-dialog": "~2",
+        "@tauri-apps/plugin-fs": "~2",
         "@tauri-apps/plugin-http": "~2",
         "@tauri-apps/plugin-opener": "^2",
+        "@vicons/fluent": "^0.13.0",
         "naive-ui": "^2.41.0",
         "vue": "^3.5.13",
       },
@@ -51,6 +53,8 @@
 
     "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.3.0", "", { "dependencies": { "@tauri-apps/api": "^2.6.0" } }, "sha512-ylSBvYYShpGlKKh732ZuaHyJ5Ie1JR71QCXewCtsRLqGdc8Is4xWdz6t43rzXyvkItM9syNPMvFVcvjgEy+/GA=="],
 
+    "@tauri-apps/plugin-fs": ["@tauri-apps/plugin-fs@2.4.0", "", { "dependencies": { "@tauri-apps/api": "^2.6.0" } }, "sha512-Sp8AdDcbyXyk6LD6Pmdx44SH3LPeNAvxR2TFfq/8CwqzfO1yOyV+RzT8fov0NNN7d9nvW7O7MtMAptJ42YXA5g=="],
+
     "@tauri-apps/plugin-http": ["@tauri-apps/plugin-http@2.5.0", "", { "dependencies": { "@tauri-apps/api": "^2.6.0" } }, "sha512-l4M2DUIsOBIMrbj4dJZwrB4mJiB7OA/2Tj3gEbX2fjq5MOpETklJPKfDvzUTDwuq4lIKCKKykz8E8tpOgvi0EQ=="],
 
     "@tauri-apps/plugin-opener": ["@tauri-apps/plugin-opener@2.2.7", "", { "dependencies": { "@tauri-apps/api": "^2.0.0" } }, ""],
@@ -62,6 +66,8 @@
     "@types/lodash": ["@types/lodash@4.17.17", "", {}, ""],
 
     "@types/lodash-es": ["@types/lodash-es@4.17.12", "", { "dependencies": { "@types/lodash": "*" } }, ""],
+
+    "@vicons/fluent": ["@vicons/fluent@0.13.0", "", {}, "sha512-bYGZsOE3qzvm3Cm43e7tybgGlr5ZUpYqtRZq0g0Tfupe8jIzLolpvQLNUt1zS8Mgt6goTbUk5YH7Fkv16jkykg=="],
 
     "@vitejs/plugin-vue": ["@vitejs/plugin-vue@5.2.4", "", { "peerDependencies": { "vite": "^5.0.0 || ^6.0.0", "vue": "^3.2.25" } }, ""],
 
@@ -174,6 +180,8 @@
     "vueuc": ["vueuc@0.4.64", "", { "dependencies": { "@css-render/vue3-ssr": "^0.15.10", "@juggle/resize-observer": "^3.3.1", "css-render": "^0.15.10", "evtd": "^0.2.4", "seemly": "^0.3.6", "vdirs": "^0.1.4", "vooks": "^0.2.4" }, "peerDependencies": { "vue": "^3.0.11" } }, ""],
 
     "@tauri-apps/plugin-dialog/@tauri-apps/api": ["@tauri-apps/api@2.6.0", "", {}, "sha512-hRNcdercfgpzgFrMXWwNDBN0B7vNzOzRepy6ZAmhxi5mDLVPNrTpo9MGg2tN/F7JRugj4d2aF7E1rtPXAHaetg=="],
+
+    "@tauri-apps/plugin-fs/@tauri-apps/api": ["@tauri-apps/api@2.6.0", "", {}, "sha512-hRNcdercfgpzgFrMXWwNDBN0B7vNzOzRepy6ZAmhxi5mDLVPNrTpo9MGg2tN/F7JRugj4d2aF7E1rtPXAHaetg=="],
 
     "@tauri-apps/plugin-http/@tauri-apps/api": ["@tauri-apps/api@2.6.0", "", {}, "sha512-hRNcdercfgpzgFrMXWwNDBN0B7vNzOzRepy6ZAmhxi5mDLVPNrTpo9MGg2tN/F7JRugj4d2aF7E1rtPXAHaetg=="],
 

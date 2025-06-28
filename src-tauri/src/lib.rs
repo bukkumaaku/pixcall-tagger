@@ -1,12 +1,7 @@
 mod aitagger;
 mod db;
 use crate::aitagger::get_tags;
-use crate::db::{
-    check_repository, create_tag_if_not_exists, get_db_connection, get_db_path, get_file_in_folder,
-    get_folder, get_valid_folders, update_image_tags,
-};
-
-use std::collections::HashMap;
+use crate::db::{check_repository, get_db_connection, get_db_path, get_valid_folders};
 
 #[tauri::command]
 fn check_repo(repo_path: String) -> bool {
@@ -115,6 +110,7 @@ async fn tag_images(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())

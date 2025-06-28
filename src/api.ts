@@ -11,7 +11,7 @@ import {
 } from "./api_interface";
 import { fetch } from "@tauri-apps/plugin-http";
 
-async function wait(ms: number) {
+export async function wait(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 export class PixcallTagger {
@@ -62,17 +62,28 @@ export class PixcallTagger {
 	}
 	async write_nonexist(tags: string[], all_tags_map: { [key: string]: string }) {
 		const tag_id: string[] = [];
-		for (const tag of tags) {
+		/* for (const tag of tags) {
 			if (!all_tags_map[tag]) {
 				const add_tag_result = (await this.api({
 					type: "create_tag",
 					name: tag,
 				})) as create_tag_response;
-				wait(10);
+				//wait(10);
 				all_tags_map[tag] = add_tag_result.tag.id.replace("~n", "");
 			}
 			tag_id.push(all_tags_map[tag]);
-		}
+		} */
+		tags.forEach(async (tag) => {
+			if (!all_tags_map[tag]) {
+				const add_tag_result = (await this.api({
+					type: "create_tag",
+					name: tag,
+				})) as create_tag_response;
+				//wait(10);
+				all_tags_map[tag] = add_tag_result.tag.id.replace("~n", "");
+			}
+			tag_id.push(all_tags_map[tag]);
+		});
 
 		return tag_id;
 	}
@@ -82,7 +93,6 @@ export class PixcallTagger {
 			id: image_id,
 			tags: tags.map((tag) => ({ type: "id", value: tag })),
 		};
-		console.log(post_data);
 		const result = (await this.api(post_data)) as null | string;
 		if (result !== null) {
 			alert("Error: " + result);

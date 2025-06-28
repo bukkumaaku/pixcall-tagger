@@ -7,11 +7,15 @@
 		"dialog:allow-open",
 		"dialog:allow-message",
 		"dialog:default",
+		"core:resources:allow-close",
 		{
 			"identifier": "http:allow-fetch-send",
 			"allow": [
 				{
 					"url": "http://127.0.0.1:*/*"
+				},
+				{
+					"url": "https://huggingface.co/*"
 				}
 			]
 		},
@@ -20,6 +24,9 @@
 			"allow": [
 				{
 					"url": "http://127.0.0.1:*/*"
+				},
+				{
+					"url": "https://huggingface.co/*"
 				}
 			]
 		},
@@ -28,6 +35,41 @@
 			"allow": [
 				{
 					"url": "http://127.0.0.1:*/*"
+				},
+				{
+					"url": "https://huggingface.co/*"
+				}
+			]
+		},
+		{
+			"identifier": "fs:allow-app-write",
+			"allow": [
+				{
+					"path": "$RESOURCE/**"
+				}
+			]
+		},
+		{
+			"identifier": "fs:allow-open",
+			"allow": [
+				{
+					"path": "$RESOURCE/**"
+				}
+			]
+		},
+		{
+			"identifier": "fs:allow-create",
+			"allow": [
+				{
+					"path": "$RESOURCE/**"
+				}
+			]
+		},
+		{
+			"identifier": "fs:allow-exists",
+			"allow": [
+				{
+					"path": "$RESOURCE/**"
 				}
 			]
 		}
