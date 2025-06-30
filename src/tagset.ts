@@ -1,4 +1,4 @@
-export const tagset = {
+export const tagset: { [key: string]: string } = {
 	zucchini: "夏南瓜",
 	zooanime: "动物园",
 	zoo_min: "放大",

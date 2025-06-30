@@ -30,6 +30,7 @@ interface FormData {
 	overwrite: string;
 	language: string;
 	splitter: string;
+	filterTags: string[];
 }
 
 const api = new PixcallTagger();
@@ -80,12 +81,13 @@ async function tagImages() {
 		})) as string[][];
 		for (let i = 0; i < thumb_hash.length; i++) {
 			tags[i] = tags[i].filter(
-				(tag) => !formData.value.filterTags.includes(tag) && !formData.value.filterTags.includes(tagset[tag])
+				(tag: string) =>
+					!formData.value.filterTags.includes(tag) && !formData.value.filterTags.includes(tagset[tag])
 			);
 			if (formData.value.language === "zh") {
-				tags[i] = tags[i].map((tag) => tagset[tag]);
+				tags[i] = tags[i].map((tag: string) => tagset[tag]);
 			} else if (formData.value.language === "mix") {
-				tags[i] = tags[i].map((tag) => tagset[tag] + formData.value.splitter + tag);
+				tags[i] = tags[i].map((tag: string) => tagset[tag] + formData.value.splitter + tag);
 			}
 			const tag_id = await api.write_nonexist(tags[i], all_tags_map);
 			await api.write_image_tags(image_id[i], tag_id);
