@@ -34,19 +34,18 @@ export class PixcallTagger {
 		});
 		return (await response.json()) || null;
 	}
-	async get_selected_images() {
+	async get_selected_images(formData: any) {
 		const result = (await this.api({ type: "get_selected_entries" })) as entry_detail[];
 		const images_id: string[] = [];
 		const thumb_hash: string[] = [];
 		for (const entry of result || []) {
-			if (entry.content_type.includes("image") && entry.id) {
+			if (
+				entry.content_type.includes("image") &&
+				entry.id &&
+				!(formData.overwrite === "nocover" && entry.tags !== "")
+			) {
 				images_id.push(entry.id); // 同步添加
-				thumb_hash.push(entry.metadata.thumb_hash); // 同步添加
-				/* const path = (await this.api({
-					type: "get_entry_path",
-					id: entry.id,
-				})) as string;
-				images_path.push(path); // 保证顺序一致 */
+				thumb_hash.push(entry.content_hash); // 同步添加
 			}
 		}
 
@@ -62,7 +61,7 @@ export class PixcallTagger {
 	}
 	async write_nonexist(tags: string[], all_tags_map: { [key: string]: string }) {
 		const tag_id: string[] = [];
-		/* for (const tag of tags) {
+		for (const tag of tags) {
 			if (!all_tags_map[tag]) {
 				const add_tag_result = (await this.api({
 					type: "create_tag",
@@ -72,18 +71,7 @@ export class PixcallTagger {
 				all_tags_map[tag] = add_tag_result.tag.id.replace("~n", "");
 			}
 			tag_id.push(all_tags_map[tag]);
-		} */
-		tags.forEach(async (tag) => {
-			if (!all_tags_map[tag]) {
-				const add_tag_result = (await this.api({
-					type: "create_tag",
-					name: tag,
-				})) as create_tag_response;
-				//wait(10);
-				all_tags_map[tag] = add_tag_result.tag.id.replace("~n", "");
-			}
-			tag_id.push(all_tags_map[tag]);
-		});
+		}
 
 		return tag_id;
 	}
@@ -97,5 +85,9 @@ export class PixcallTagger {
 		if (result !== null) {
 			alert("Error: " + result);
 		}
+	}
+	async get_file_server() {
+		const result: any = await this.api({ type: "get_settings" });
+		return result.file_server;
 	}
 }

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    pixcall_aitagger_lib::run()
+    pixcall_auto_tagger_lib::run()
 }

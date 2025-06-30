@@ -1,5 +1,5 @@
 [package]
-name = "pixcall-aitagger"
+name = "pixcall-auto-tagger"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -11,7 +11,7 @@ edition = "2021"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "pixcall_aitagger_lib"
+name = "pixcall_auto_tagger_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -32,3 +32,5 @@ tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
 rayon = "1.10.0"
 tauri-plugin-fs = "2"
+reqwest = "0.12.20"
+tauri-plugin-store = "2"

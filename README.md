@@ -1,16 +1,42 @@
-# Tauri + Vue + TypeScript
+# pixcall-auto-tagger
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+pixcall-auto-tagger 是一个针对 Pixcall 插件的自动图片打标工具，可以方便地对 Pixcall 中的图片进行智能打标。
 
-## Recommended IDE Setup
+---
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## 功能简介
 
-## Type Support For `.vue` Imports in TS
+-   自动识别并为 Pixcall 中的图片添加标签
+-   需要 Pixcall 或 Pixcall 后台程序运行时同步使用
+-   支持自动下载所需模型（需挂梯子）
+-   支持手动放置模型文件及标签配置文件
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+---
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+## 安装说明
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+1. **确保已安装并运行 Pixcall 或 Pixcall 后台程序**，本插件依赖其环境支持。
+2. 运行 pixcall-auto-tagger 时，程序会自动在当前 exe 路径下创建名称为模型名称的文件夹，并尝试下载所需模型（需挂梯子）。
+3. 如果无法自动下载，可以自行下载对应模型文件及 `selected_tags.csv`，放置到对应文件夹中。
+
+---
+
+## 使用方法
+
+1. 打开 Pixcall，选择需要打标的图片。
+2. 启动 pixcall-auto-tagger。
+3. 根据需要调整软件界面中的参数。
+4. 点击 “开始打标” 按钮，等待打标过程完成。
+5. 完成后即可在 Pixcall 中看到自动添加的标签。
+
+---
+
+## 注意事项
+
+-   打标功能依赖 Pixcall 正常运行，确保 Pixcall 已启动。
+-   模型文件较大，首次自动下载可能较慢，请耐心等待且确保网络可用。
+-   需要科学上网环境以顺利完成模型下载。
+
+---
+
+感谢使用，欢迎反馈问题和建议！

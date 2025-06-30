@@ -72,6 +72,17 @@
 					"path": "$RESOURCE/**"
 				}
 			]
-		}
+		},
+		{
+			"identifier": "fs:allow-mkdir",
+			"allow": [
+				{
+					"path": "$RESOURCE/**"
+				}
+			]
+		},
+		"store:default",
+		"core:event:allow-listen",
+		"core:event:default"
 	]
 }

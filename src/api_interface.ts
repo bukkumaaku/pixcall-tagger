@@ -154,3 +154,7 @@ export interface get_all_tags_tag {
 export interface get_all_tags_response {
 	tags: get_all_tags_tag[];
 }
+
+export interface get_settings {
+	type: string;
+}

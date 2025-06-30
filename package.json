@@ -1,5 +1,5 @@
 {
-	"name": "pixcall-tagger",
+	"name": "pixcall-auto-tagger",
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
@@ -15,6 +15,7 @@
 		"@tauri-apps/plugin-fs": "~2",
 		"@tauri-apps/plugin-http": "~2",
 		"@tauri-apps/plugin-opener": "^2",
+		"@tauri-apps/plugin-store": "~2",
 		"@vicons/fluent": "^0.13.0",
 		"naive-ui": "^2.41.0",
 		"vue": "^3.5.13"
