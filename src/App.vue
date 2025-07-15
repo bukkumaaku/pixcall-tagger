@@ -63,12 +63,10 @@ async function tagImages() {
 		message.error("请选择模型");
 		return;
 	}
-
 	if (formData.value.modelOptions.includes("|未下载")) {
 		message.error("请先下载模型");
 		return;
 	}
-
 	try {
 		message.info("开始打标，请稍候...");
 		const fileServer = await api.get_file_server();
