@@ -136,14 +136,6 @@ export interface get_all_tags {
 }
 
 export interface get_all_tags_tag {
-	/* {
-			"category": "D",
-			"group_id": null,
-			"id": "~n479149018884056064",
-			"name": "dddddddd",
-			"pinyin": "",
-			"revision": 1
-		} */
 	category: string;
 	group_id: string | null;
 	id: string;
