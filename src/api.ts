@@ -27,12 +27,15 @@ export class PixcallTagger {
 		| []
 		| string
 	> {
+		//console.log("开始调用" + data.type);
 		const response = await fetch("http://127.0.0.1:22510/request", {
 			method: "POST",
 			body: JSON.stringify(data),
 			headers: { "Content-Type": "application/json" },
 		});
-		return (await response.json()) || null;
+		const result = (await response.json()) || null;
+		//console.log("结束调用" + JSON.stringify(result));
+		return result;
 	}
 	async get_selected_images(formData: any) {
 		const result = (await this.api({ type: "get_selected_entries" })) as entry_detail[];
@@ -42,7 +45,7 @@ export class PixcallTagger {
 			if (
 				entry.content_type.includes("image") &&
 				entry.id &&
-				!(formData.overwrite === "nocover" && entry.tags !== "")
+				!(formData.overwrite === "nocover" && entry.tags !== null)
 			) {
 				images_id.push(entry.id); // 同步添加
 				thumb_hash.push(entry.content_hash); // 同步添加

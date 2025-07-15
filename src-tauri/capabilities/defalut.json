@@ -81,6 +81,14 @@
 				}
 			]
 		},
+		{
+			"identifier": "fs:allow-read-dir",
+			"allow": [
+				{
+					"path": "$RESOURCE/**"
+				}
+			]
+		},
 		"store:default",
 		"core:event:allow-listen",
 		"core:event:default"

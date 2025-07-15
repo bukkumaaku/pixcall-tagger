@@ -1,5 +1,7 @@
 mod aitagger;
+mod download;
 use crate::aitagger::get_tags;
+use crate::download::download_file;
 
 #[tauri::command]
 async fn tag_images(
@@ -33,7 +35,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![tag_images])
+        .invoke_handler(tauri::generate_handler![tag_images, download_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

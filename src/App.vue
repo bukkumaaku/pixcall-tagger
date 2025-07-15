@@ -2,7 +2,7 @@
 import { ref, onMounted, Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { PixcallTagger } from "./api";
-import { BaseDirectory, open as openFile, exists as fileExists, mkdir } from "@tauri-apps/plugin-fs";
+import { BaseDirectory, exists as fileExists, mkdir, readDir, exists } from "@tauri-apps/plugin-fs";
 import { load, Store } from "@tauri-apps/plugin-store";
 import { listen } from "@tauri-apps/api/event";
 import { tagset } from "./tagset";
@@ -21,6 +21,9 @@ import {
 	NRadioGroup,
 	NRadio,
 	NInput,
+	NCard,
+	NModal,
+	NSwitch,
 } from "naive-ui";
 
 interface FormData {
@@ -73,8 +76,8 @@ async function tagImages() {
 		const all_tags_map = await api.get_all_tags();
 		const tags = (await invoke("tag_images", {
 			thumbHash: thumb_hash,
-			tagPath: `${formData.value.modelOptions.split("/")[1]}/selected_tags.csv`,
-			modelPath: `${formData.value.modelOptions.split("/")[1]}/model.onnx`,
+			tagPath: `models/${formData.value.modelOptions}/selected_tags.csv`,
+			modelPath: `models/${formData.value.modelOptions}/model.onnx`,
 			fileServer: fileServer,
 			threshold: formData.value.threshold,
 			batchSize: formData.value.batchSize,
@@ -111,62 +114,80 @@ async function tagImages() {
 }
 
 async function predownloadFile(name: string) {
-	const folderName = name.split("/")[1];
-	await mkdir(`${folderName}`, { baseDir: BaseDirectory.Resource });
-	const modelUrl = `https://huggingface.co/${name}/resolve/main/model.onnx`;
-	const tagUrl = `https://huggingface.co/${name}/resolve/main/selected_tags.csv`;
-	const modelPath = `${folderName}/model.onnx`;
-	const tagPath = `${folderName}/selected_tags.csv`;
+	let model_name = name.split("/").pop()!;
+	console.log(model_name);
+	downloadStatus.value = true;
+	const folderName = "models/" + model_name;
+	try {
+		if (!(await exists(folderName, { baseDir: BaseDirectory.Resource })))
+			await mkdir(`${folderName}`, { baseDir: BaseDirectory.Resource });
+	} catch (error) {
+		console.log(error);
+	}
+
 	downloadModelProcess.value = 0;
 	downloadTagProcess.value = 0;
-	await downloadFilePureFrontend(modelUrl, modelPath, downloadModelProcess);
-	await downloadFilePureFrontend(tagUrl, tagPath, downloadTagProcess);
-	formData.value.modelOptions = name;
-	saveFormData();
+	await downloadFromRust(name, "selected_tags.csv", downloadTagProcess, isProxy);
+	await downloadFromRust(name, "model.onnx", downloadModelProcess, isProxy);
+	formData.value.modelOptions = model_name;
+	await saveFormData();
+	downloadStatus.value = false;
+	await loadModelOptions();
 }
 
-async function downloadFilePureFrontend(url: string, fileName: string, downloadProcess: Ref<number>) {
-	const file = await openFile(fileName, {
-		append: true,
-		create: true,
-		write: true,
-		baseDir: BaseDirectory.Resource,
-	});
+let tmp_process;
 
-	try {
-		// 1. 发起 Fetch 请求
-		const response = await fetch(url);
-		if (!response.ok) throw new Error("下载失败");
-		// 2. 获取文件大小（用于进度计算）
-		const contentLength = response.headers.get("content-length");
-		const totalBytes = contentLength ? parseInt(contentLength) : 0;
-		let receivedBytes = 0;
-		// 3. 读取流数据并监听进度
-		const reader = response.body?.getReader();
-		if (!reader) throw new Error("无法读取数据流");
-		//const chunks: Uint8Array[] = [];
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			//chunks.push(value);
-			await file.write(value);
-			receivedBytes += value.length;
-			// 计算并显示进度（可选）
-			if (totalBytes > 0) {
-				const percent = Math.round((receivedBytes / totalBytes) * 10000) / 100;
-				console.log(`下载进度: ${percent}%`);
-				downloadProcess.value = percent;
-				// 更新 UI 进度条（示例）
-			}
-		}
-		alert(`文件已保存到下载文件夹: ${fileName}`);
-	} catch (error) {
-		console.error("下载失败:", error);
-		alert("下载失败，请检查链接或网络！");
-	}
-	file.close();
+listen("download_progress", (event) => {
+	console.log(event.payload);
+	tmp_process!.value = parseInt(event.payload as string);
+});
+
+async function downloadFromRust(
+	modelName: string,
+	fileName: string,
+	download_process: Ref<number>,
+	isProxy: Ref<boolean>
+) {
+	tmp_process = download_process;
+	console.log(
+		await invoke("download_file", {
+			modelName: modelName,
+			fileName: fileName,
+			isProxy: isProxy.value,
+		})
+	);
+	download_process.value = 100;
+	dialog.success({ title: "下载成功", content: `文件已保存到下载文件夹: ${fileName}` });
 }
+
 const modelOptions: Ref<{ label: string; value: string }[]> = ref([]);
+const modelExsits = async (name: string) => {
+	const modelPath = `models/${name}/model.onnx`;
+	const tagPath = `models/${name}/selected_tags.csv`;
+	return (
+		(await fileExists(modelPath, { baseDir: BaseDirectory.Resource })) &&
+		(await fileExists(tagPath, { baseDir: BaseDirectory.Resource }))
+	);
+};
+async function loadModelOptions() {
+	const modelList: { name: string; isDirectory: boolean; isFile: boolean; isSymlink: boolean }[] = await readDir(
+		"models",
+		{ baseDir: BaseDirectory.Resource }
+	);
+	const modelEmbedOptions = [];
+	for (const item of modelList) {
+		if (!item.isDirectory) {
+			continue;
+		}
+		if (await modelExsits(item.name)) {
+			modelEmbedOptions.push({
+				label: item.name,
+				value: item.name,
+			});
+		}
+	}
+	modelOptions.value = modelEmbedOptions;
+}
 onMounted(async () => {
 	store = await load("store.json", { autoSave: true });
 	if ((await store.get("formData")) === undefined) {
@@ -180,40 +201,36 @@ onMounted(async () => {
 			filterTags: [],
 		});
 	}
-	formData.value = (await store.get("formData")) as FormData;
-	const modelEmbedOptions = [
-		{
-			label: "SmilingWolf/wd-eva02-large-tagger-v3",
-			value: "SmilingWolf/wd-eva02-large-tagger-v3",
-		},
-		{
-			label: "SmilingWolf/wd-vit-large-tagger-v3",
-			value: "SmilingWolf/wd-vit-large-tagger-v3",
-		},
-		{
-			label: "SmilingWolf/wd-v1-4-moat-tagger-v2",
-			value: "SmilingWolf/wd-v1-4-moat-tagger-v2",
-		},
-	];
-	for (const option of modelEmbedOptions) {
-		const folderName = option.value.split("/")[1];
-		const modelPath = `${folderName}/model.onnx`;
-		const tagPath = `${folderName}/selected_tags.csv`;
-		if (
-			!(await fileExists(modelPath, { baseDir: BaseDirectory.Resource })) ||
-			!(await fileExists(tagPath, { baseDir: BaseDirectory.Resource }))
-		) {
-			option.label += "|未下载";
-			option.value += "|未下载";
+	try {
+		if (!(await exists(`models`, { baseDir: BaseDirectory.Resource }))) {
+			await mkdir(`models`, { baseDir: BaseDirectory.Resource });
 		}
+	} catch (error) {
+		console.log(error);
+	}
+	await loadModelOptions();
+	formData.value = (await store.get("formData")) as FormData;
+	if (
+		modelOptions.value.length === 0 ||
+		modelOptions.value.filter((item) => {
+			return item.value === formData.value.modelOptions;
+		}).length === 0
+	) {
+		dialog.info({
+			title: "请先下载模型！",
+			content:
+				"下载模型有两种方法：\n\n1、clone模型到该程序models文件夹下，或直接下载model.onnx和selected_tags.csv文件到models文件夹下的对应文件夹内（速度较快）；\n\n2、直接在本页面下载模型（速度慢，但简单）。",
+			positiveText: "OK",
+			contentStyle: "white-space: pre-line",
+		});
+		formData.value.modelOptions = "";
 	}
 	setTimer();
-	modelOptions.value = modelEmbedOptions;
 	await saveFormData();
 });
 
 async function saveFormData() {
-	if (formData.value.modelOptions === "SmilingWolf/wd-v1-4-moat-tagger-v2") {
+	if (formData.value.modelOptions === "wd-v1-4-moat-tagger-v2") {
 		formData.value.batchSize = 1;
 	}
 	await store.set("formData", formData.value);
@@ -221,6 +238,23 @@ async function saveFormData() {
 
 const downloadModelProcess = ref(0);
 const downloadTagProcess = ref(0);
+const showDownloadDialog = ref(false);
+const selectedDownloadModel = ref("SmilingWolf/wd-v1-4-moat-tagger-v2");
+const downloadStatus = ref(false);
+const modelEmbedOptions = [
+	{
+		label: "SmilingWolf/wd-eva02-large-tagger-v3",
+		value: "SmilingWolf/wd-eva02-large-tagger-v3",
+	},
+	{
+		label: "SmilingWolf/wd-vit-large-tagger-v3",
+		value: "SmilingWolf/wd-vit-large-tagger-v3",
+	},
+	{
+		label: "SmilingWolf/wd-v1-4-moat-tagger-v2",
+		value: "SmilingWolf/wd-v1-4-moat-tagger-v2",
+	},
+];
 let timer: number | undefined;
 const setTimer = () => {
 	timer = setInterval(async () => {
@@ -230,6 +264,7 @@ const setTimer = () => {
 };
 const allPic = ref(0);
 const completedPic = ref(0);
+const isProxy = ref(false);
 </script>
 
 <template>
@@ -243,34 +278,7 @@ const completedPic = ref(0);
 			<n-form-item label="选择图片" path="pixcall">{{ completedPic }}/{{ allPic }}</n-form-item>
 			<n-form-item label="选择模型" path="modelSelect">
 				<n-select :options="modelOptions" v-model:value="formData.modelOptions" @update:value="saveFormData" />
-			</n-form-item>
-
-			<n-form-item label="下载模型" path="modelDownload" v-show="formData.modelOptions.includes('|未下载')">
-				<n-space vertical>
-					<n-space justify="space-between">
-						<span>selected_tags.csv</span>
-						<n-progress
-							style="width: 150px"
-							type="line"
-							:percentage="downloadTagProcess"
-							indicator-placement="inside"
-							processing
-						/>
-					</n-space>
-					<n-space justify="space-between">
-						<span>model.onnx</span>
-						<n-progress
-							style="width: 150px"
-							type="line"
-							:percentage="downloadModelProcess"
-							indicator-placement="inside"
-							processing
-						/>
-					</n-space>
-					<n-button type="primary" @click="predownloadFile(formData.modelOptions.split('|')[0])">
-						下载模型
-					</n-button>
-				</n-space>
+				<n-button @click="showDownloadDialog = true">下载模型</n-button>
 			</n-form-item>
 			<n-form-item label="阈值" path="thereshold">
 				<n-input-number
@@ -337,6 +345,55 @@ const completedPic = ref(0);
 				<n-button type="primary" @click="tagImages">开始打标</n-button>
 			</div>
 		</n-form>
+		<n-modal v-model:show="showDownloadDialog" :mask-closable="false">
+			<n-card style="width: 600px" title="下载模型" :bordered="false" size="huge" role="dialog" aria-modal="true">
+				<n-space vertical>
+					<n-space> <span>下载是否代理：</span><n-switch v-model:value="isProxy"></n-switch></n-space>
+					<n-radio-group
+						v-model:value="selectedDownloadModel"
+						name="radiobuttongroup1"
+						:disabled="downloadStatus"
+					>
+						<n-radio
+							v-for="model in modelEmbedOptions"
+							:key="model.value"
+							:value="model.value"
+							:label="model.label"
+						/>
+					</n-radio-group>
+					<n-space justify="space-between">
+						<span>selected_tags.csv</span>
+						<n-progress
+							style="width: 150px"
+							type="line"
+							:percentage="downloadTagProcess"
+							indicator-placement="inside"
+							processing
+						/>
+					</n-space>
+					<n-space justify="space-between">
+						<span>model.onnx</span>
+						<n-progress
+							style="width: 150px"
+							type="line"
+							:percentage="downloadModelProcess"
+							indicator-placement="inside"
+							processing
+						/>
+					</n-space>
+					<n-button type="primary" @click="predownloadFile(selectedDownloadModel)" :disabled="downloadStatus">
+						下载
+					</n-button>
+				</n-space>
+				<template #footer>
+					<n-space justify="end">
+						<n-button type="primary" @click="showDownloadDialog = false" :disabled="downloadStatus"
+							>关闭</n-button
+						>
+					</n-space>
+				</template>
+			</n-card>
+		</n-modal>
 	</n-message-provider>
 </template>
 
