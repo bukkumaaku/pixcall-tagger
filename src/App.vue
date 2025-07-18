@@ -56,6 +56,10 @@ listen("addnumber", (event) => {
 	completedPic.value += event.payload as number;
 });
 
+let image_id: string[],
+	thumb_hash: string[],
+	all_tags_map: { [key: string]: string },
+	thumb_to_image: { [key: string]: string } = {};
 // 执行打标
 async function tagImages() {
 	clearInterval(timer);
@@ -70,37 +74,27 @@ async function tagImages() {
 	try {
 		message.info("开始打标，请稍候...");
 		const fileServer = await api.get_file_server();
-		const [image_id, thumb_hash] = await api.get_selected_images(formData.value);
-		const all_tags_map = await api.get_all_tags();
-		const tags = (await invoke("tag_images", {
-			thumbHash: thumb_hash,
-			tagPath: `models/${formData.value.modelOptions}/selected_tags.csv`,
-			modelPath: `models/${formData.value.modelOptions}/model.onnx`,
-			fileServer: fileServer,
-			threshold: formData.value.threshold,
-			batchSize: formData.value.batchSize,
-		})) as string[][];
+		[image_id, thumb_hash] = await api.get_selected_images(formData.value);
 		for (let i = 0; i < thumb_hash.length; i++) {
-			tags[i] = tags[i].filter(
-				(tag: string) =>
-					!formData.value.filterTags.includes(tag) && !formData.value.filterTags.includes(tagset[tag])
-			);
-			if (formData.value.language === "zh") {
-				tags[i] = tags[i].map((tag: string) => tagset[tag]);
-			} else if (formData.value.language === "mix") {
-				tags[i] = tags[i].map((tag: string) => tagset[tag] + formData.value.splitter + tag);
-			}
-			const tag_id = await api.write_nonexist(tags[i], all_tags_map);
-			await api.write_image_tags(image_id[i], tag_id);
+			thumb_to_image[thumb_hash[i]] = image_id[i];
 		}
-		message.success("打标完成！");
+		all_tags_map = await api.get_all_tags();
+		console.log(
+			await invoke("tag_images", {
+				thumbHash: thumb_hash,
+				tagPath: `models/${formData.value.modelOptions}/selected_tags.csv`,
+				modelPath: `models/${formData.value.modelOptions}/model.onnx`,
+				fileServer: fileServer,
+				threshold: formData.value.threshold,
+				batchSize: formData.value.batchSize,
+			})
+		);
 		dialog.success({
 			title: "成功",
 			content: "打标完成！",
 			positiveText: "OK",
 		});
 	} catch (error) {
-		message.error("打标失败: " + error);
 		dialog.error({
 			title: "失败",
 			content: "打标失败！",
@@ -110,6 +104,26 @@ async function tagImages() {
 	setTimer();
 	completedPic.value = 0;
 }
+
+listen("acquire_tags", async (event) => {
+	const data = event.payload as { temp_set: string[][]; batch: string[]; size: number };
+	for (let i = 0; i < data.size; i++) {
+		let tags = data.temp_set[i];
+		console.log(tags);
+		tags = tags.filter(
+			(tag: string) =>
+				!formData.value.filterTags.includes(tag) && !formData.value.filterTags.includes(tagset[tag])
+		);
+		if (formData.value.language === "zh") {
+			tags = tags.map((tag: string) => tagset[tag]);
+		} else if (formData.value.language === "mix") {
+			tags = tags.map((tag: string) => tagset[tag] + formData.value.splitter + tag);
+		}
+		console.log(tags);
+		const tag_id = await api.write_nonexist(tags, all_tags_map);
+		await api.write_image_tags(thumb_to_image[data.batch[i]], tag_id);
+	}
+});
 
 async function predownloadFile(name: string) {
 	let model_name = name.split("/").pop()!;
@@ -137,7 +151,7 @@ let tmp_process;
 
 listen("download_progress", (event) => {
 	console.log(event.payload);
-	tmp_process!.value = parseInt(event.payload as string);
+	tmp_process!.value = Number(event.payload as string);
 });
 
 async function downloadFromRust(
@@ -199,12 +213,8 @@ onMounted(async () => {
 			filterTags: [],
 		});
 	}
-	try {
-		if (!(await exists(`models`, { baseDir: BaseDirectory.Resource }))) {
-			await mkdir(`models`, { baseDir: BaseDirectory.Resource });
-		}
-	} catch (error) {
-		console.log(error);
+	if (!(await exists(`models`, { baseDir: BaseDirectory.Resource }))) {
+		await mkdir(`models`, { baseDir: BaseDirectory.Resource });
 	}
 	await loadModelOptions();
 	formData.value = (await store.get("formData")) as FormData;
@@ -346,7 +356,9 @@ const isProxy = ref(false);
 		<n-modal v-model:show="showDownloadDialog" :mask-closable="false">
 			<n-card style="width: 600px" title="下载模型" :bordered="false" size="huge" role="dialog" aria-modal="true">
 				<n-space vertical>
-					<n-space> <span>下载是否代理：</span><n-switch v-model:value="isProxy"></n-switch></n-space>
+					<n-space>
+						<span>下载是否使用huggingface镜像：</span><n-switch v-model:value="isProxy"></n-switch
+					></n-space>
 					<n-radio-group
 						v-model:value="selectedDownloadModel"
 						name="radiobuttongroup1"
@@ -385,9 +397,9 @@ const isProxy = ref(false);
 				</n-space>
 				<template #footer>
 					<n-space justify="end">
-						<n-button type="primary" @click="showDownloadDialog = false" :disabled="downloadStatus"
-							>关闭</n-button
-						>
+						<n-button type="primary" @click="showDownloadDialog = false" :disabled="downloadStatus">
+							关闭
+						</n-button>
 					</n-space>
 				</template>
 			</n-card>

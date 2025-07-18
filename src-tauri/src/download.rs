@@ -60,7 +60,7 @@ pub async fn download_file(
         // 计算并显示进度
         if total_size > 0 {
             let tmp_progress = (downloaded as f64 / total_size as f64) * 100.0;
-            if (tmp_progress - progress).abs() < 1.0 {
+            if (tmp_progress - progress).abs() < 0.01 {
                 continue; // 如果进度变化小于0.1%，则跳过打印
             }
             app.emit("download_progress", format!("{:.2}", tmp_progress))

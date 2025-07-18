@@ -12,7 +12,7 @@ async fn tag_images(
     file_server: String,
     threshold: f32,
     batch_size: usize,
-) -> Result<Vec<Vec<String>>, String> {
+) -> Result<String, String> {
     let tag_sets = get_tags(
         &app,
         &tag_path,

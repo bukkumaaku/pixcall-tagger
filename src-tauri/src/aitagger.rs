@@ -5,9 +5,18 @@ use ort::{
     session::{builder::GraphOptimizationLevel, Session},
     value::TensorRef,
 };
+use serde::Serialize;
 use std::fs;
 use tauri::Emitter;
 
+// 为你的数据定义一个清晰的结构体
+#[derive(Serialize, Clone)]
+struct AcquireTagsPayload<'a> {
+    // 使用生命周期 'a 来借用数据，避免不必要的克隆
+    temp_set: &'a Vec<Vec<String>>,
+    batch: &'a [String],
+    size: &'a usize,
+}
 pub async fn fetch_image_async(
     hash: &String,
     file_server: &String,
@@ -127,12 +136,11 @@ pub async fn get_tags(
     app: &tauri::AppHandle,
     tag_path: &str,
     model_path: &str,
-    thumb_hash: &[String], // Change to reference
+    thumb_hash: &[String],
     file_server: &String,
     threshold: f32,
     batch_size: usize,
-) -> Result<Vec<Vec<String>>, String> {
-    let mut tag_sets: Vec<Vec<String>> = vec![];
+) -> Result<String, String> {
     let tags = get_tag_list(tag_path).map_err(|e| e.to_string())?;
     // 加载ONNX模型 (使用原始模型路径)
     let hash_batches = thumb_hash.chunks(batch_size);
@@ -141,7 +149,12 @@ pub async fn get_tags(
         let temp_set = get_image_tag(app, batch, &mut session, &threshold, &tags, file_server)
             .await
             .unwrap();
-        tag_sets.extend(temp_set);
+        let payload = AcquireTagsPayload {
+            temp_set: &temp_set,
+            batch: &batch,
+            size: &batch.len(),
+        };
+        app.emit("acquire_tags", payload).unwrap();
     }
-    Ok(tag_sets)
+    Ok("Tags acquired successfully".to_string())
 }

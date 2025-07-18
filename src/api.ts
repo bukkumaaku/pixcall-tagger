@@ -42,6 +42,7 @@ export class PixcallTagger {
 		const images_id: string[] = [];
 		const thumb_hash: string[] = [];
 		for (const entry of result || []) {
+			if (entry.metadata.has_thumb !== true) continue;
 			if (
 				entry.content_type.includes("image") &&
 				entry.id &&
