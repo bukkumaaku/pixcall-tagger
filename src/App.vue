@@ -72,6 +72,7 @@ async function tagImages() {
 		return;
 	}
 	try {
+		startTagger.value = true;
 		message.info("开始打标，请稍候...");
 		const fileServer = await api.get_file_server();
 		[image_id, thumb_hash] = await api.get_selected_images(formData.value);
@@ -94,12 +95,14 @@ async function tagImages() {
 			content: "打标完成！",
 			positiveText: "OK",
 		});
+		startTagger.value = false;
 	} catch (error) {
 		dialog.error({
 			title: "失败",
 			content: "打标失败！",
 			positiveText: "OK",
 		});
+		startTagger.value = false;
 	}
 	setTimer();
 	completedPic.value = 0;
@@ -107,9 +110,9 @@ async function tagImages() {
 
 listen("acquire_tags", async (event) => {
 	const data = event.payload as { temp_set: string[][]; batch: string[]; size: number };
+	console.log(data);
 	for (let i = 0; i < data.size; i++) {
 		let tags = data.temp_set[i];
-		console.log(tags);
 		tags = tags.filter(
 			(tag: string) =>
 				!formData.value.filterTags.includes(tag) && !formData.value.filterTags.includes(tagset[tag])
@@ -119,7 +122,6 @@ listen("acquire_tags", async (event) => {
 		} else if (formData.value.language === "mix") {
 			tags = tags.map((tag: string) => tagset[tag] + formData.value.splitter + tag);
 		}
-		console.log(tags);
 		const tag_id = await api.write_nonexist(tags, all_tags_map);
 		await api.write_image_tags(thumb_to_image[data.batch[i]], tag_id);
 	}
@@ -273,6 +275,7 @@ const setTimer = () => {
 const allPic = ref(0);
 const completedPic = ref(0);
 const isProxy = ref(false);
+const startTagger = ref(false);
 </script>
 
 <template>
@@ -350,7 +353,7 @@ const isProxy = ref(false);
 				/>
 			</n-form-item>
 			<div style="display: flex; gap: 10px; justify-content: flex-end">
-				<n-button type="primary" @click="tagImages">开始打标</n-button>
+				<n-button type="primary" @click="tagImages" :disabled="startTagger">开始打标</n-button>
 			</div>
 		</n-form>
 		<n-modal v-model:show="showDownloadDialog" :mask-closable="false">

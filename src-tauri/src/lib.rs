@@ -14,11 +14,11 @@ async fn tag_images(
     batch_size: usize,
 ) -> Result<String, String> {
     let tag_sets = get_tags(
-        &app,
-        &tag_path,
-        &model_path,
-        &thumb_hash,
-        &file_server,
+        app,
+        tag_path,
+        model_path,
+        thumb_hash,
+        file_server,
         threshold,
         batch_size,
     )
