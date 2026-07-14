@@ -27,6 +27,9 @@ pub struct CheckForUpdateRequest {}
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SystemToolsRequest {}
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct MinimizePluginWindowRequest {}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadFileRequest {
@@ -306,6 +309,7 @@ pub enum Command {
     Aaa(AaaRequest),
     CheckForUpdate(CheckForUpdateRequest),
     SystemTools(SystemToolsRequest),
+    MinimizePluginWindow(MinimizePluginWindowRequest),
     DownloadFile(DownloadFileRequest),
     ReadConfig(ReadConfigRequest),
     WriteConfig(WriteConfigRequest),
@@ -367,6 +371,12 @@ pub struct CheckForUpdateResult {
 pub struct SystemToolsResult {
     pub ffmpeg_path: Option<String>,
     pub ffprobe_path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MinimizePluginWindowResult {
+    pub minimized: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -672,6 +682,7 @@ pub enum ResultPayload {
     Aaa(AaaResult),
     CheckForUpdate(CheckForUpdateResult),
     SystemTools(SystemToolsResult),
+    MinimizePluginWindow(MinimizePluginWindowResult),
     DownloadFile(DownloadFileResult),
     ReadConfig(ReadConfigResult),
     WriteConfig(WriteConfigResult),

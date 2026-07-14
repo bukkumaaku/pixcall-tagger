@@ -51,6 +51,7 @@ dependencies = [
  "vector-store",
  "video-tagger",
  "wd-tagger",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

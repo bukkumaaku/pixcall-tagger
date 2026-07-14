@@ -11,6 +11,7 @@ import {
     type PathInfoResult,
     type ScanWdModelsResult,
     type SystemToolsResult,
+    type MinimizePluginWindowResult,
     type ProgressPayload,
     PROTOCOL_VERSION,
     type ResultDataMap,
@@ -100,6 +101,10 @@ export class BackendClient {
 
     systemTools(): Promise<SystemToolsResult> {
         return this.request("system_tools", {});
+    }
+
+    minimizePluginWindow(): Promise<MinimizePluginWindowResult> {
+        return this.request("minimize_plugin_window", {});
     }
 
     downloadFile(

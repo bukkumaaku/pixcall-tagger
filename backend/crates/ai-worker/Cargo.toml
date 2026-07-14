@@ -13,6 +13,7 @@ gemini-embedding.workspace = true
 llamafile.workspace = true
 openai-embedding.workspace = true
 protocol.workspace = true
+windows-sys.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

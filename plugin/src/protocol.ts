@@ -11,6 +11,7 @@ export type AaaRequest = {
 export type CheckForUpdateRequest = Record<string, never>;
 
 export type SystemToolsRequest = Record<string, never>;
+export type MinimizePluginWindowRequest = Record<string, never>;
 
 export type DownloadFileRequest = {
     url: string;
@@ -208,6 +209,7 @@ export type CommandPayloadMap = {
     aaa: AaaRequest;
     check_for_update: CheckForUpdateRequest;
     system_tools: SystemToolsRequest;
+    minimize_plugin_window: MinimizePluginWindowRequest;
     download_file: DownloadFileRequest;
     read_config: ReadConfigRequest;
     write_config: WriteConfigRequest;
@@ -261,6 +263,10 @@ export type CheckForUpdateResult = {
 export type SystemToolsResult = {
     ffmpegPath: string | null;
     ffprobePath: string | null;
+};
+
+export type MinimizePluginWindowResult = {
+    minimized: boolean;
 };
 
 export type DownloadFileResult = {
@@ -454,6 +460,7 @@ export type ResultDataMap = {
     aaa: AaaResult;
     check_for_update: CheckForUpdateResult;
     system_tools: SystemToolsResult;
+    minimize_plugin_window: MinimizePluginWindowResult;
     download_file: DownloadFileResult;
     read_config: ReadConfigResult;
     write_config: WriteConfigResult;

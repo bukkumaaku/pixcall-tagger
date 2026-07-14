@@ -11,6 +11,7 @@ pub mod scan_embedding_models;
 pub mod scan_wd_models;
 pub mod system_tools;
 pub mod wd_tagger;
+pub mod window_control;
 
 use protocol::{Command, ProgressPayload, ResultPayload};
 use thiserror::Error;
@@ -84,6 +85,9 @@ impl CommandHandler for BuiltinHandlers {
             }
             Command::SystemTools(request) => {
                 system_tools::handle(request).map(ResultPayload::SystemTools)
+            }
+            Command::MinimizePluginWindow(request) => {
+                window_control::minimize(request).map(ResultPayload::MinimizePluginWindow)
             }
             Command::DownloadFile(request) => {
                 download_file::handle(request, events).map(ResultPayload::DownloadFile)
