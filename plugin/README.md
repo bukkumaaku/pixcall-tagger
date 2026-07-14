@@ -1,6 +1,6 @@
 # Pixcall AI Tagger Plugin
 
-Vue page plugin for Pixcall 0.9.5 or newer. The installable development plugin is generated at `plugin/dist`.
+Vue modal command plugin for Pixcall 0.9.5 or newer. The installable development plugin is generated at `plugin/dist`.
 
 ```powershell
 npm run plugin:build
