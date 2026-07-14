@@ -8,6 +8,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.tmp
+backend/target
+src-tauri/target
+/bin/
+*.tsbuildinfo
 dist
 dist-ssr
 *.local

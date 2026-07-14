@@ -1,42 +1,49 @@
-# pixcall-auto-tagger
+# Pixcall AI Tagger
 
-pixcall-auto-tagger 是一个针对 Pixcall 插件的自动图片打标工具，可以方便地对 Pixcall 中的图片进行智能打标。
+Pixcall AI Tagger 是一个通过 Pixcall 本地 API 工作的 Tauri 桌面伴侣。当前版本迁移自 Eagle AI Tagger 2.0，并将宿主读写、窗口控制和 worker 生命周期改为 Pixcall/Tauri 实现。
 
----
+## 功能
 
-## 功能简介
+- WD / CL / Camie ONNX 图片打标
+- 本地 llamafile 多模态标签与图片注释
+- 本地、OpenAI 和 Gemini 向量模型的语义索引与搜索
+- 模型下载、模型目录管理、任务进度和失败记录
+- 中文、英文及双语标签，支持过滤、不覆写、覆写和合并
 
--   自动识别并为 Pixcall 中的图片添加标签
--   需要 Pixcall 或 Pixcall 后台程序运行时同步使用
--   支持自动下载所需模型（需挂梯子）
--   支持手动放置模型文件及标签配置文件
+## 运行要求
 
----
+- Windows 10/11 x64
+- Pixcall 或 Pixcall 后台程序正在运行，并监听 `http://127.0.0.1:22510/request`
+- Node.js 20+、Rust stable；开发模式还需要可用的 MSVC 工具链
 
-## 安装说明
+首次启动会要求选择模型根目录。程序会在该目录下使用 `wd`、`llm`、`embedding` 和 `llamafile` 子目录。
 
-1. **确保已安装并运行 Pixcall 或 Pixcall 后台程序**，本插件依赖其环境支持。
-2. 运行 pixcall-auto-tagger 时，程序会自动在当前 exe 路径下创建名称为模型名称的文件夹，并尝试下载所需模型（需挂梯子）。
-3. 如果无法自动下载，可以自行下载对应模型文件及 `selected_tags.csv`，放置到对应文件夹中。
+## 开发
 
----
+```powershell
+npm install
+npm run tauri dev
+```
 
-## 使用方法
+生产构建：
 
-1. 打开 Pixcall，选择需要打标的图片。
-2. 启动 pixcall-auto-tagger。
-3. 根据需要调整软件界面中的参数。
-4. 点击 “开始打标” 按钮，等待打标过程完成。
-5. 完成后即可在 Pixcall 中看到自动添加的标签。
+```powershell
+npm run tauri build
+```
 
----
+构建脚本会先编译 `backend` 中的 `ai-worker`，再将 worker 及 DirectML 运行库复制到 `bin/win-x64`，最后由 Tauri 作为资源打包。
 
-## 注意事项
+## Pixcall API 适配
 
--   打标功能依赖 Pixcall 正常运行，确保 Pixcall 已启动。
--   模型文件较大，首次自动下载可能较慢，请耐心等待且确保网络可用。
--   需要科学上网环境以顺利完成模型下载。
+基础打标依赖以下请求：
 
----
+- `get_selected_entries`
+- `get_entry_path`
+- `get_all_tags`
+- `create_tag`
+- `update_entry`
+- `get_settings`
 
-感谢使用，欢迎反馈问题和建议！
+全库打标和语义索引还需要 Pixcall 支持 `get_all_entries` 或 `get_entries`。若当前 Pixcall 版本未提供全库接口，选中项打标仍可使用，应用会对全库操作给出明确错误。
+
+Pixcall 当前没有向该工具暴露 FFmpeg 路径，因此视频逐帧读取选项会保持禁用；视频缩略图仍可按普通图片参与 WD 打标。
