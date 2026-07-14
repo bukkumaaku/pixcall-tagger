@@ -38,13 +38,14 @@ npm run tauri build
 基础打标依赖以下请求：
 
 - `get_selected_entries`
+- `search_entries` 与 `get_entries`
 - `get_entry_path`
 - `get_all_tags`
 - `create_tag`
 - `update_entry`
 - `get_settings`
 
-全库打标和语义索引还需要 Pixcall 支持 `get_all_entries` 或 `get_entries`。若当前 Pixcall 版本未提供全库接口，选中项打标仍可使用，应用会对全库操作给出明确错误。
+全库打标和语义索引通过 `search_entries` 获取条目 ID，再由 `get_entries` 批量读取完整数据。
 
 Pixcall 的向量索引文件名为 `pixcall-semantic-index.sqlite3`，即使与 Eagle 共用模型根目录，也不会覆盖 Eagle 的 `semantic-index.sqlite3`。
 

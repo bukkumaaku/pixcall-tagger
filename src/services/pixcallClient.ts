@@ -12,9 +12,12 @@ export type PixcallEntry = {
     content_type?: string;
     source_path?: string | null;
     tags?: string | null;
+    tag_ids?: string[];
     description?: string | null;
     mtime?: string | number;
     updated_at?: string;
+    image_width?: number;
+    image_height?: number;
     metadata?: {
         image_width?: number;
         image_height?: number;
@@ -23,7 +26,14 @@ export type PixcallEntry = {
 
 type PixcallTag = { id: string; name: string };
 type TagListResponse = { tags: PixcallTag[] };
-type SettingsResponse = { file_server?: string; library_path?: string; library_name?: string };
+type EntryListResponse = { entries: PixcallEntry[] };
+type SearchEntry = { id: string; is_folder: boolean };
+type SettingsResponse = {
+    file_server?: string;
+    library_path?: string;
+    library_name?: string;
+    library?: { id?: string; path?: string };
+};
 
 export type PixcallItem = {
     id: string;
@@ -68,26 +78,38 @@ class PixcallClient {
         return this.settings;
     }
 
+    get libraryNamespace() {
+        const identity = this.settings?.library?.id || this.settings?.library?.path || "default";
+        return `pixcall:${identity}`;
+    }
+
+    get libraryName() {
+        return this.settings?.library_name || "Pixcall";
+    }
+
     async getSelectedItems() {
+        await this.getSettings();
         const entries = await this.request<PixcallEntry[]>({ type: "get_selected_entries" });
         return this.hydrateEntries(entries || []);
     }
 
     async getAllItems() {
-        let entries: PixcallEntry[] | null = null;
-        let lastError: unknown;
-        for (const type of ["get_all_entries", "get_entries"]) {
-            try {
-                entries = await this.request<PixcallEntry[]>({ type });
-                if (Array.isArray(entries)) break;
-                lastError = new Error(`Pixcall API ${type} 未返回条目数组`);
-                entries = null;
-            } catch (error) {
-                lastError = error;
-            }
-        }
-        if (!entries) {
-            throw new Error(`当前 Pixcall API 不支持读取全库条目，无法执行全库任务或语义索引：${lastError instanceof Error ? lastError.message : String(lastError || "未知错误")}`);
+        await this.getSettings();
+        const matches = await this.request<SearchEntry[]>({
+            type: "search_entries",
+            filters: {},
+        });
+        const ids = (matches || [])
+            .filter((entry) => !entry.is_folder)
+            .map((entry) => normalizeId(entry.id));
+        if (ids.length === 0) return [];
+        const entries: PixcallEntry[] = [];
+        for (let offset = 0; offset < ids.length; offset += 500) {
+            const result = await this.request<EntryListResponse>({
+                type: "get_entries",
+                ids: ids.slice(offset, offset + 500),
+            });
+            entries.push(...(result.entries || []));
         }
         return this.hydrateEntries(entries);
     }
@@ -116,21 +138,24 @@ class PixcallClient {
     }
 
     private async hydrateEntry(entry: PixcallEntry): Promise<PixcallItem> {
-        this.entries.set(entry.id, entry);
+        const id = normalizeId(entry.id);
+        this.entries.set(id, entry);
         await this.ensureTags();
         const filePath = await this.resolveEntryPath(entry);
-        const tagIds = String(entry.tags || "").split("|").filter(Boolean);
+        const tagIds = entry.tag_ids?.length
+            ? entry.tag_ids
+            : String(entry.tags || "").split("|").filter(Boolean);
         const item: PixcallItem = {
-            id: entry.id,
-            name: entry.name || entry.id,
+            id,
+            name: entry.name || id,
             ext: extensionFrom(entry),
             tags: tagIds.map((id) => this.tagById.get(normalizeId(id))).filter((tag): tag is string => Boolean(tag)),
             annotation: entry.description || "",
             filePath,
             thumbnailPath: filePath,
-            modifiedAt: Number(entry.mtime) || Date.parse(entry.updated_at || "") || 0,
-            width: entry.metadata?.image_width,
-            height: entry.metadata?.image_height,
+            modifiedAt: Number(String(entry.mtime || "").replace(/^~n/, "")) || Date.parse(entry.updated_at || "") || 0,
+            width: entry.image_width ?? entry.metadata?.image_width,
+            height: entry.image_height ?? entry.metadata?.image_height,
             isDeleted: false,
             save: async () => {
                 await this.saveItem(item);
@@ -141,7 +166,10 @@ class PixcallClient {
 
     private async resolveEntryPath(entry: PixcallEntry) {
         if (entry.source_path) return entry.source_path;
-        const result = await this.request<unknown>({ type: "get_entry_path", id: entry.id });
+        const result = await this.request<unknown>({
+            type: "get_entry_path",
+            id: normalizeId(entry.id),
+        });
         if (typeof result === "string") return result;
         if (result && typeof result === "object") {
             const record = result as Record<string, unknown>;
@@ -185,6 +213,7 @@ class PixcallClient {
         const entry = this.entries.get(item.id);
         if (entry) {
             entry.tags = ids.join("|");
+            entry.tag_ids = ids;
             entry.description = item.annotation;
         }
     }
@@ -204,7 +233,10 @@ export const pixcallClient = new PixcallClient();
 
 export function installPixcallHost() {
     const host = {
-        library: { name: "Pixcall", path: "pixcall" },
+        library: {
+            get name() { return pixcallClient.libraryName; },
+            get path() { return pixcallClient.libraryNamespace; },
+        },
         item: {
             getSelected: () => pixcallClient.getSelectedItems(),
             getAll: () => pixcallClient.getAllItems(),
