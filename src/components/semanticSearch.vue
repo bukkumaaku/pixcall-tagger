@@ -57,7 +57,7 @@
     import { joinPath, localAssetUrl } from "../services/pathUtils";
 
     const SESSION_ID = "embedding-main";
-    const INDEX_FILENAME = "semantic-index.sqlite3";
+    const INDEX_FILENAME = "pixcall-semantic-index.sqlite3";
     const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "bmp"]);
 
     type PixcallImage = {

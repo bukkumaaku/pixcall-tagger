@@ -46,4 +46,6 @@ npm run tauri build
 
 全库打标和语义索引还需要 Pixcall 支持 `get_all_entries` 或 `get_entries`。若当前 Pixcall 版本未提供全库接口，选中项打标仍可使用，应用会对全库操作给出明确错误。
 
+Pixcall 的向量索引文件名为 `pixcall-semantic-index.sqlite3`，即使与 Eagle 共用模型根目录，也不会覆盖 Eagle 的 `semantic-index.sqlite3`。
+
 Pixcall 当前没有向该工具暴露 FFmpeg 路径，因此视频逐帧读取选项会保持禁用；视频缩略图仍可按普通图片参与 WD 打标。
