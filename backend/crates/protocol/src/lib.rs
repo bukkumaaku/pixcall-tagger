@@ -24,6 +24,9 @@ pub struct AaaRequest {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CheckForUpdateRequest {}
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SystemToolsRequest {}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadFileRequest {
@@ -302,6 +305,7 @@ pub enum Command {
     Echo(EchoRequest),
     Aaa(AaaRequest),
     CheckForUpdate(CheckForUpdateRequest),
+    SystemTools(SystemToolsRequest),
     DownloadFile(DownloadFileRequest),
     ReadConfig(ReadConfigRequest),
     WriteConfig(WriteConfigRequest),
@@ -356,6 +360,13 @@ pub struct CheckForUpdateResult {
     pub latest_version: String,
     pub update_available: bool,
     pub release_url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemToolsResult {
+    pub ffmpeg_path: Option<String>,
+    pub ffprobe_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -660,6 +671,7 @@ pub enum ResultPayload {
     Echo(EchoResult),
     Aaa(AaaResult),
     CheckForUpdate(CheckForUpdateResult),
+    SystemTools(SystemToolsResult),
     DownloadFile(DownloadFileResult),
     ReadConfig(ReadConfigResult),
     WriteConfig(WriteConfigResult),

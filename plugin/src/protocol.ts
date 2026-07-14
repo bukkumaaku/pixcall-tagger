@@ -10,6 +10,8 @@ export type AaaRequest = {
 
 export type CheckForUpdateRequest = Record<string, never>;
 
+export type SystemToolsRequest = Record<string, never>;
+
 export type DownloadFileRequest = {
     url: string;
     destination: string;
@@ -205,6 +207,7 @@ export type CommandPayloadMap = {
     echo: EchoRequest;
     aaa: AaaRequest;
     check_for_update: CheckForUpdateRequest;
+    system_tools: SystemToolsRequest;
     download_file: DownloadFileRequest;
     read_config: ReadConfigRequest;
     write_config: WriteConfigRequest;
@@ -253,6 +256,11 @@ export type CheckForUpdateResult = {
     latestVersion: string;
     updateAvailable: boolean;
     releaseUrl: string;
+};
+
+export type SystemToolsResult = {
+    ffmpegPath: string | null;
+    ffprobePath: string | null;
 };
 
 export type DownloadFileResult = {
@@ -445,6 +453,7 @@ export type ResultDataMap = {
     echo: EchoResult;
     aaa: AaaResult;
     check_for_update: CheckForUpdateResult;
+    system_tools: SystemToolsResult;
     download_file: DownloadFileResult;
     read_config: ReadConfigResult;
     write_config: WriteConfigResult;

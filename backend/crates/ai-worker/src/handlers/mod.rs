@@ -9,6 +9,7 @@ pub mod openai_embedding;
 pub mod path_info;
 pub mod scan_embedding_models;
 pub mod scan_wd_models;
+pub mod system_tools;
 pub mod wd_tagger;
 
 use protocol::{Command, ProgressPayload, ResultPayload};
@@ -80,6 +81,9 @@ impl CommandHandler for BuiltinHandlers {
             Command::Aaa(request) => aaa::handle(request).map(ResultPayload::Aaa),
             Command::CheckForUpdate(request) => {
                 check_update::handle(request).map(ResultPayload::CheckForUpdate)
+            }
+            Command::SystemTools(request) => {
+                system_tools::handle(request).map(ResultPayload::SystemTools)
             }
             Command::DownloadFile(request) => {
                 download_file::handle(request, events).map(ResultPayload::DownloadFile)

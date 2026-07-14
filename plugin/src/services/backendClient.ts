@@ -10,6 +10,7 @@ import {
     type ReadConfigResult,
     type PathInfoResult,
     type ScanWdModelsResult,
+    type SystemToolsResult,
     type ProgressPayload,
     PROTOCOL_VERSION,
     type ResultDataMap,
@@ -95,6 +96,10 @@ export class BackendClient {
 
     checkForUpdate(): Promise<CheckForUpdateResult> {
         return this.request("check_for_update", {});
+    }
+
+    systemTools(): Promise<SystemToolsResult> {
+        return this.request("system_tools", {});
     }
 
     downloadFile(

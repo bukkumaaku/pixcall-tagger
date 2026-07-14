@@ -21,6 +21,10 @@ export async function pixcallCommand<T>(payload: Record<string, unknown>): Promi
     return pixcallSend<T>("command", payload);
 }
 
+export async function closePixcallWindow() {
+    await pixcallCommand({ type: "close_current_window" });
+}
+
 async function pixcallSend<T>(endpoint: string, payload: Record<string, unknown>): Promise<T> {
     if (!pixcallBaseUrl) {
         const port = await getPixcallContext<number>("serverPort");

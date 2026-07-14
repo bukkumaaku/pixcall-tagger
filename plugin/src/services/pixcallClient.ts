@@ -1,4 +1,5 @@
 import { getPixcallContext, pixcallCommand, pixcallRequest } from "./pixcallBridge";
+import { getBackendClient } from "./backendClient";
 
 export type PixcallEntry = {
     id: string;
@@ -248,8 +249,17 @@ export function installPixcallHost() {
         },
         extraModule: {
             ffmpeg: {
-                isInstalled: async () => false,
-                getPaths: async () => { throw new Error("Pixcall 版本暂未配置 FFmpeg"); },
+                isInstalled: async () => {
+                    const tools = await getBackendClient().systemTools();
+                    return Boolean(tools.ffmpegPath && tools.ffprobePath);
+                },
+                getPaths: async () => {
+                    const tools = await getBackendClient().systemTools();
+                    if (!tools.ffmpegPath || !tools.ffprobePath) {
+                        throw new Error("PATH 中未找到 ffmpeg 或 ffprobe");
+                    }
+                    return { ffmpeg: tools.ffmpegPath, ffprobe: tools.ffprobePath };
+                },
             },
         },
         window: {
