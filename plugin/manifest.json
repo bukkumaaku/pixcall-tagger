@@ -1,0 +1,29 @@
+{
+  "id": "ai-tagger",
+  "name": "AI 自动标签",
+  "description": "使用本地 WD、视觉语言和向量模型为 Pixcall 素材打标签、生成注释并进行语义搜索。",
+  "version": "2.0.1",
+  "author": "kankan",
+  "homepage": "https://github.com/bukkumaaku/pixcall-tagger",
+  "icon": "icon.png",
+  "plugin_type": "page",
+  "main": "index.html",
+  "minimum_core_version": "0.9.5",
+  "manifest_version": 2,
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-tagger",
+        "title": "AI 自动标签"
+      }
+    ],
+    "context_menus": [
+      {
+        "command": "ai-tagger",
+        "when": "has_selection"
+      }
+    ]
+  },
+  "l10n": "./l10n",
+  "default_locale": "zh-CN"
+}

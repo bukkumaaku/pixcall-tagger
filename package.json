@@ -8,6 +8,8 @@
         "worker:release": "cargo build --manifest-path backend/Cargo.toml --release -p ai-worker && node scripts/copy-worker.mjs release",
         "dev": "npm run worker:debug && vite",
         "build": "npm run worker:release && vue-tsc -b && vite build",
+        "plugin:dev": "vite plugin --config plugin/vite.config.ts",
+        "plugin:build": "npm run worker:release && vue-tsc -p plugin/tsconfig.json --noEmit && vite build plugin --config plugin/vite.config.ts && node plugin/scripts/prepare-dist.mjs",
         "preview": "vite preview",
         "tauri": "tauri"
     },

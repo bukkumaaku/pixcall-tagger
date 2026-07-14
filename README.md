@@ -31,6 +31,14 @@ npm run tauri dev
 npm run tauri build
 ```
 
+Pixcall 内置页面插件位于 `plugin/`。构建后可将 `plugin/dist` 作为开发插件目录安装：
+
+```powershell
+npm run plugin:build
+```
+
+插件通过 `window.pixcall` 连接当前 Pixcall 实例，并使用 `spawn_child_process` 启动隐藏的 HTTP `ai-worker`；现有 Tauri 桌面版仍可独立使用。
+
 构建脚本会先编译 `backend` 中的 `ai-worker`，再将 worker 及 DirectML 运行库复制到 `bin/win-x64`，最后由 Tauri 作为资源打包。
 
 ## Pixcall API 适配
