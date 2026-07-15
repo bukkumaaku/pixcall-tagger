@@ -32,6 +32,12 @@ pub struct MinimizePluginWindowRequest {}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PixcallListEntryIdsRequest {
+    pub database_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadFileRequest {
     pub url: String,
     pub destination: String,
@@ -310,6 +316,7 @@ pub enum Command {
     CheckForUpdate(CheckForUpdateRequest),
     SystemTools(SystemToolsRequest),
     MinimizePluginWindow(MinimizePluginWindowRequest),
+    PixcallListEntryIds(PixcallListEntryIdsRequest),
     DownloadFile(DownloadFileRequest),
     ReadConfig(ReadConfigRequest),
     WriteConfig(WriteConfigRequest),
@@ -377,6 +384,13 @@ pub struct SystemToolsResult {
 #[serde(rename_all = "camelCase")]
 pub struct MinimizePluginWindowResult {
     pub minimized: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PixcallListEntryIdsResult {
+    pub database_path: String,
+    pub ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -683,6 +697,7 @@ pub enum ResultPayload {
     CheckForUpdate(CheckForUpdateResult),
     SystemTools(SystemToolsResult),
     MinimizePluginWindow(MinimizePluginWindowResult),
+    PixcallListEntryIds(PixcallListEntryIdsResult),
     DownloadFile(DownloadFileResult),
     ReadConfig(ReadConfigResult),
     WriteConfig(WriteConfigResult),

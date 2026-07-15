@@ -1,5 +1,6 @@
 import { getPixcallContext, pixcallCommand, pixcallRequest } from "./pixcallBridge";
 import { getBackendClient } from "./backendClient";
+import { joinPath } from "./pathUtils";
 
 export type PixcallEntry = {
     id: string;
@@ -93,13 +94,7 @@ class PixcallClient {
 
     async getAllItems() {
         await this.getSettings();
-        const matches = await this.request<SearchEntry[]>({
-            type: "search_entries",
-            filters: {},
-        });
-        const ids = (matches || [])
-            .filter((entry) => !entry.is_folder)
-            .map((entry) => normalizeId(entry.id));
+        const ids = await this.getDatabaseEntryIds() ?? await this.getSearchEntryIds();
         if (ids.length === 0) return [];
         const entries: PixcallEntry[] = [];
         for (let offset = 0; offset < ids.length; offset += 500) {
@@ -110,6 +105,30 @@ class PixcallClient {
             entries.push(...(result.entries || []));
         }
         return this.hydrateEntries(entries);
+    }
+
+    private async getDatabaseEntryIds(): Promise<string[] | null> {
+        const libraryPath = this.settings?.library?.path || this.settings?.library_path;
+        if (!libraryPath) return null;
+
+        const databasePath = joinPath(libraryPath, ".pixcall", "database", "main.db");
+        try {
+            const result = await getBackendClient().listPixcallEntryIds(databasePath);
+            return [...new Set((result.ids || []).map(normalizeId))];
+        } catch (error) {
+            console.warn("无法读取 Pixcall 数据库，将回退到 search_entries：", error);
+            return null;
+        }
+    }
+
+    private async getSearchEntryIds() {
+        const matches = await this.request<SearchEntry[]>({
+            type: "search_entries",
+            filters: {},
+        });
+        return (matches || [])
+            .filter((entry) => !entry.is_folder)
+            .map((entry) => normalizeId(entry.id));
     }
 
     async getItem(id: string) {

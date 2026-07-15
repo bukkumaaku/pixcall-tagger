@@ -7,6 +7,7 @@ pub mod embedding;
 pub mod llamafile;
 pub mod openai_embedding;
 pub mod path_info;
+pub mod pixcall_database;
 pub mod scan_embedding_models;
 pub mod scan_wd_models;
 pub mod system_tools;
@@ -88,6 +89,9 @@ impl CommandHandler for BuiltinHandlers {
             }
             Command::MinimizePluginWindow(request) => {
                 window_control::minimize(request).map(ResultPayload::MinimizePluginWindow)
+            }
+            Command::PixcallListEntryIds(request) => {
+                pixcall_database::handle(request).map(ResultPayload::PixcallListEntryIds)
             }
             Command::DownloadFile(request) => {
                 download_file::handle(request, events).map(ResultPayload::DownloadFile)

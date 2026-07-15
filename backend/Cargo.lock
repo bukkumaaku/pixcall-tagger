@@ -45,6 +45,7 @@ dependencies = [
  "openai-embedding",
  "protocol",
  "reqwest",
+ "rusqlite",
  "serde",
  "serde_json",
  "thiserror",

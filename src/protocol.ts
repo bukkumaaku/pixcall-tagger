@@ -13,6 +13,10 @@ export type CheckForUpdateRequest = Record<string, never>;
 export type SystemToolsRequest = Record<string, never>;
 export type MinimizePluginWindowRequest = Record<string, never>;
 
+export type PixcallListEntryIdsRequest = {
+    databasePath: string;
+};
+
 export type DownloadFileRequest = {
     url: string;
     destination: string;
@@ -210,6 +214,7 @@ export type CommandPayloadMap = {
     check_for_update: CheckForUpdateRequest;
     system_tools: SystemToolsRequest;
     minimize_plugin_window: MinimizePluginWindowRequest;
+    pixcall_list_entry_ids: PixcallListEntryIdsRequest;
     download_file: DownloadFileRequest;
     read_config: ReadConfigRequest;
     write_config: WriteConfigRequest;
@@ -267,6 +272,11 @@ export type SystemToolsResult = {
 
 export type MinimizePluginWindowResult = {
     minimized: boolean;
+};
+
+export type PixcallListEntryIdsResult = {
+    databasePath: string;
+    ids: string[];
 };
 
 export type DownloadFileResult = {
@@ -461,6 +471,7 @@ export type ResultDataMap = {
     check_for_update: CheckForUpdateResult;
     system_tools: SystemToolsResult;
     minimize_plugin_window: MinimizePluginWindowResult;
+    pixcall_list_entry_ids: PixcallListEntryIdsResult;
     download_file: DownloadFileResult;
     read_config: ReadConfigResult;
     write_config: WriteConfigResult;

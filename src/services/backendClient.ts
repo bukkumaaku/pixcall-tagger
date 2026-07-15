@@ -12,6 +12,7 @@ import {
     type ScanWdModelsResult,
     type SystemToolsResult,
     type MinimizePluginWindowResult,
+    type PixcallListEntryIdsResult,
     type ProgressPayload,
     PROTOCOL_VERSION,
     type ResultDataMap,
@@ -105,6 +106,10 @@ export class BackendClient {
 
     minimizePluginWindow(): Promise<MinimizePluginWindowResult> {
         return this.request("minimize_plugin_window", {});
+    }
+
+    listPixcallEntryIds(databasePath: string): Promise<PixcallListEntryIdsResult> {
+        return this.request("pixcall_list_entry_ids", { databasePath });
     }
 
     downloadFile(
