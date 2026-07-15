@@ -428,6 +428,14 @@ fn spawn_server(
         command.arg("--gpu").arg(gpu);
     }
 
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
     apply_runtime_environment(&mut command, runtime_directory);
     command.spawn().map_err(|source| LlamafileError::Spawn {
         path: config.executable_path.clone(),
