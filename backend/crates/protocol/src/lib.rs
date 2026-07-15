@@ -165,6 +165,8 @@ pub struct EmbeddingSearchImageRequest {
     pub image_path: String,
     #[serde(default)]
     pub exclude_item_id: String,
+    #[serde(default)]
+    pub image_modified_at: i64,
     pub top_k: usize,
 }
 

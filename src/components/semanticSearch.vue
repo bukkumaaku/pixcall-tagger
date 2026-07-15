@@ -672,6 +672,7 @@
                         SESSION_ID,
                         imagePath,
                         item.id,
+                        Number(item.modifiedAt) || 0,
                         resultCount,
                     )
                 ).hits;

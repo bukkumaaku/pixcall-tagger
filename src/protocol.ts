@@ -127,6 +127,7 @@ export type EmbeddingSearchImageRequest = {
     sessionId: string;
     imagePath: string;
     excludeItemId: string;
+    imageModifiedAt: number;
     topK: number;
 };
 
