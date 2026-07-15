@@ -27,8 +27,8 @@
         "command": "ai-tagger",
         "title": "AI 自动标签",
         "icon": {
-          "light": "icon.png",
-          "dark": "icon.png"
+          "light": "icons/context-menu.png",
+          "dark": "icons/context-menu.png"
         }
       }
     ],

@@ -9,6 +9,8 @@ await mkdir(dist, { recursive: true });
 await copyFile(path.join(projectRoot, "manifest.json"), path.join(dist, "manifest.json"));
 await copyFile(path.join(projectRoot, "icon.png"), path.join(dist, "icon.png"));
 await copyFile(path.join(projectRoot, "tagset.csv"), path.join(dist, "tagset.csv"));
+await rm(path.join(dist, "icons"), { recursive: true, force: true });
+await cp(path.join(projectRoot, "icons"), path.join(dist, "icons"), { recursive: true });
 await rm(path.join(dist, "l10n"), { recursive: true, force: true });
 await cp(path.join(projectRoot, "l10n"), path.join(dist, "l10n"), { recursive: true });
 await rm(path.join(dist, "bin"), { recursive: true, force: true });

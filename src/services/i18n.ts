@@ -4,7 +4,10 @@ import en from "../../l10n/en.json";
 let messages: unknown = zhCN;
 
 export async function initializeI18n() {
-    const settings = await window.pixcall?.getContext("settings").catch(() => null);
+    const settings = await Promise.race([
+        window.pixcall?.getContext("settings").catch(() => null) ?? Promise.resolve(null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 300)),
+    ]);
     const record = settings && typeof settings === "object"
         ? settings as Record<string, unknown>
         : {};
