@@ -94,6 +94,7 @@ jobs:
           mkdir -p release-dist/bin
           cp -a artifacts/windows/. release-dist/
           cp -a artifacts/macos/bin/mac-arm64 release-dist/bin/
+          chmod +x release-dist/bin/mac-arm64/ai-worker
           test -f release-dist/bin/win-x64/ai-worker.exe
           test -x release-dist/bin/mac-arm64/ai-worker
           test -f release-dist/manifest.json
