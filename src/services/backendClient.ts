@@ -10,10 +10,11 @@ import {
     type ReadConfigResult,
     type PathInfoResult,
     type ScanWdModelsResult,
+    type SystemToolsResult,
+    type MinimizePluginWindowResult,
     type ProgressPayload,
     PROTOCOL_VERSION,
     type ResultDataMap,
-    type WorkerMessage,
     type WriteConfigResult,
     type WdExecutionProvider,
     type WdModelKind,
@@ -42,15 +43,7 @@ import {
     type EmbeddingUnloadResult,
     createRequest,
 } from "../protocol";
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-
-type PendingRequest = {
-    expectedKind: keyof ResultDataMap;
-    resolve: (value: unknown) => void;
-    reject: (error: Error) => void;
-    onProgress?: (progress: ProgressPayload) => void;
-};
+import { ensureWorker, workerRequest } from "./pixcallBridge";
 
 export class BackendClientError extends Error {
     readonly code: string;
@@ -72,12 +65,9 @@ export class BackendClient {
     private sequence = 0;
     private generation = 0;
     private running = false;
-    private unlisten: UnlistenFn | null = null;
-    private listenerPromise: Promise<void> | null = null;
-    private readonly pending = new Map<string, PendingRequest>();
 
     get path() {
-        return "tauri://ai-worker";
+        return "http://127.0.0.1:22511";
     }
 
     get isRunning() {
@@ -91,10 +81,9 @@ export class BackendClient {
     start() {
         if (this.running) return;
         this.running = true;
-        this.listenerPromise ??= listen<WorkerMessage>("worker-progress", (event) => {
-            this.handleMessage(event.payload);
-        }).then((unlisten) => {
-            this.unlisten = unlisten;
+        void ensureWorker().catch((error) => {
+            this.running = false;
+            console.error("Failed to start ai-worker", error);
         });
     }
 
@@ -108,6 +97,14 @@ export class BackendClient {
 
     checkForUpdate(): Promise<CheckForUpdateResult> {
         return this.request("check_for_update", {});
+    }
+
+    systemTools(): Promise<SystemToolsResult> {
+        return this.request("system_tools", {});
+    }
+
+    minimizePluginWindow(): Promise<MinimizePluginWindowResult> {
+        return this.request("minimize_plugin_window", {});
     }
 
     downloadFile(
@@ -314,18 +311,9 @@ export class BackendClient {
 
     dispose() {
         this.running = false;
-        this.unlisten?.();
-        this.unlisten = null;
-        this.listenerPromise = null;
-        void invoke("worker_dispose").catch((error) => {
-            console.warn("Failed to stop ai-worker", error);
-        });
-        this.rejectAll(
-            new BackendClientError("WORKER_DISPOSED", "ai-worker was disposed"),
-        );
     }
 
-    private request<K extends CommandType>(
+    private async request<K extends CommandType>(
         type: K,
         payload: CommandPayloadMap[K],
         onProgress?: (progress: ProgressPayload) => void,
@@ -333,88 +321,29 @@ export class BackendClient {
         this.start();
         const requestId = `r-${Date.now()}-${++this.sequence}`;
         const request = createRequest(requestId, type, payload);
-
-        return new Promise<ResultDataMap[K]>((resolve, reject) => {
-            const pending: PendingRequest = {
-                expectedKind: type,
-                resolve: (value) => resolve(value as ResultDataMap[K]),
-                reject,
-                onProgress,
-            };
-            this.pending.set(requestId, pending);
-            void (async () => {
-                try {
-                    await this.listenerPromise;
-                    const message = await invoke<WorkerMessage>("worker_request", { request });
-                    this.handleMessage(message);
-                } catch (error) {
-                    if (!this.pending.delete(requestId)) return;
-                    this.running = false;
-                    this.generation++;
-                    pending.reject(
-                        error instanceof Error
-                            ? error
-                            : new BackendClientError("WORKER_REQUEST_FAILED", String(error), requestId),
-                    );
-                }
-            })();
-        });
-    }
-
-    private handleMessage(message: WorkerMessage) {
-        if (message.protocolVersion !== PROTOCOL_VERSION) {
-            console.error("Unsupported ai-worker protocol version", message);
-            return;
-        }
-
-        if (!message.requestId) {
-            console.error("Uncorrelated ai-worker message", message);
-            return;
-        }
-
-        const pending = this.pending.get(message.requestId);
-        if (!pending) return;
-
-        if (message.type === "progress") {
-            try {
-                pending.onProgress?.(message.payload);
-            } catch (error) {
-                console.error("Download progress callback failed", error);
+        const messages = await workerRequest(request, (message) => {
+            if (message.protocolVersion === PROTOCOL_VERSION && message.type === "progress") {
+                onProgress?.(message.payload);
             }
-            return;
-        }
-
-        this.pending.delete(message.requestId);
-        if (message.type === "error") {
-            pending.reject(
-                new BackendClientError(
-                    message.payload.code,
-                    message.payload.message,
-                    message.requestId,
-                ),
-            );
-            return;
-        }
-
-        if (message.payload.kind !== pending.expectedKind) {
-            pending.reject(
-                new BackendClientError(
+        });
+        for (const message of messages) {
+            if (message.protocolVersion !== PROTOCOL_VERSION) continue;
+            if (message.type === "progress") {
+                continue;
+            }
+            if (message.type === "error") {
+                throw new BackendClientError(message.payload.code, message.payload.message, message.requestId);
+            }
+            if (message.payload.kind !== type) {
+                throw new BackendClientError(
                     "RESULT_KIND_MISMATCH",
-                    `expected ${pending.expectedKind}, got ${message.payload.kind}`,
+                    `expected ${type}, got ${message.payload.kind}`,
                     message.requestId,
-                ),
-            );
-            return;
+                );
+            }
+            return message.payload.data as ResultDataMap[K];
         }
-
-        pending.resolve(message.payload.data);
-    }
-
-    private rejectAll(error: Error) {
-        for (const pending of this.pending.values()) {
-            pending.reject(error);
-        }
-        this.pending.clear();
+        throw new BackendClientError("WORKER_EMPTY_RESPONSE", "ai-worker returned no result", requestId);
     }
 }
 

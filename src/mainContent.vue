@@ -23,6 +23,42 @@
 
     const collapsed = ref(true);
     const currentPage = ref("wdtype");
+    let updateCheckStarted = false;
+
+    async function openReleasePage(url: string) {
+        await eagle.shell.openExternal(url);
+    }
+
+    async function checkForUpdate() {
+        if (updateCheckStarted) return;
+        updateCheckStarted = true;
+        try {
+            const result = await backenAPI.checkForUpdate();
+            if (!result.updateAvailable) return;
+            dialog.warning({
+                title: t.value("update.title"),
+                content:
+                    `${t.value("update.current_version")}${result.currentVersion}` +
+                    `${t.value("update.latest_version")}${result.latestVersion}` +
+                    t.value("update.open_prompt"),
+                positiveText: t.value("update.open_release"),
+                negativeText: t.value("update.later"),
+                onPositiveClick: async () => {
+                    try {
+                        await openReleasePage(result.releaseUrl);
+                    } catch (error) {
+                        notification(
+                            `${t.value("update.open_failed")}: ${error instanceof Error ? error.message : String(error)}`,
+                            "error",
+                        );
+                    }
+                },
+            });
+        } catch (error) {
+            updateCheckStarted = false;
+            console.warn("检查更新失败", error);
+        }
+    }
 
     const renderIcon = (icon: Component) => {
         return () => h(NIcon, null, { default: () => h(icon) });
@@ -30,22 +66,22 @@
 
     const menuOptions: MenuOption[] = [
         {
-            label: "WD 模型打标签",
+            label: t.value("nav.wd"),
             key: "wdtype",
             icon: renderIcon(PricetagsOutline),
         },
         {
-            label: "LLM 图像理解",
+            label: t.value("nav.llm"),
             key: "llmtype",
             icon: renderIcon(SparklesOutline),
         },
         {
-            label: "语义搜索",
+            label: t.value("nav.semantic_search"),
             key: "semantic-search",
             icon: renderIcon(ImagesOutline),
         },
         {
-            label: "设置",
+            label: t.value("nav.settings"),
             key: "settings",
             icon: renderIcon(SettingsOutline),
         },
@@ -66,9 +102,8 @@
         await backenAPI.getConfig();
         if (config.modelLocation === "") {
             dialog.error({
-                title: "错误",
-                content:
-                    "未设置模型文件路径。点击确认后请选择一个位置安置模型文件。",
+                title: t.value("startup.model_location_title"),
+                content: t.value("startup.model_location_required"),
                 positiveText: "OK",
                 maskClosable: false,
                 closeOnEsc: false,
@@ -80,9 +115,12 @@
                     if (!result.canceled && result.filePaths?.[0]) {
                         config.modelLocation = result.filePaths[0];
                         await backenAPI.setConfig();
+                        void checkForUpdate();
                     }
                 },
             });
+        } else {
+            void checkForUpdate();
         }
     });
 </script>

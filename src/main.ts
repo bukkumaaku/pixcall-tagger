@@ -4,9 +4,11 @@ import App from "./App.vue";
 import { getBackendClient } from "./services/backendClient";
 import { installPixcallHost } from "./services/pixcallClient";
 import { initializeRuntimePaths } from "./services/pathUtils";
+import { initializeI18n } from "./services/i18n";
 
 async function bootstrap() {
     installPixcallHost();
+    await initializeI18n();
     await initializeRuntimePaths();
     const backend = getBackendClient();
     backend.start();

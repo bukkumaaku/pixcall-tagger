@@ -1,31 +1,25 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-
 let resourceRoot = "";
 
 export async function initializeRuntimePaths() {
-    const paths = await invoke<{ resourceRoot: string }>("runtime_paths");
-    resourceRoot = paths.resourceRoot;
+    const pathname = decodeURIComponent(window.location.pathname).replace(/^\/+([A-Za-z]:)/, "$1");
+    resourceRoot = dirname(pathname.replace(/\//g, "\\"));
 }
 
 export function joinPath(...parts: string[]) {
     const filtered = parts.filter(Boolean);
     if (filtered.length === 0) return "";
     const separator = filtered[0].includes("\\") ? "\\" : "/";
-    const prefix = /^[A-Za-z]:[\\/]$/.test(filtered[0]) ? filtered.shift() : "";
-    const joined = filtered
-        .map((part, index) =>
-            index === 0
-                ? part.replace(/[\\/]+$/g, "")
-                : part.replace(/^[\\/]+|[\\/]+$/g, ""),
-        )
+    return filtered
+        .map((part, index) => index === 0
+            ? part.replace(/[\\/]+$/g, "")
+            : part.replace(/^[\\/]+|[\\/]+$/g, ""))
         .filter(Boolean)
         .join(separator);
-    return prefix ? `${prefix}${joined}` : joined;
 }
 
 export function resolveResourcePath(filePath: string) {
     if (isAbsolutePath(filePath)) return filePath;
-    if (!resourceRoot) throw new Error("应用资源目录尚未初始化");
+    if (!resourceRoot) throw new Error("插件资源目录尚未初始化");
     return joinPath(resourceRoot, filePath.replace(/^src[\\/]public[\\/]/, ""));
 }
 
@@ -41,9 +35,9 @@ export function extname(filePath: string) {
 }
 
 export function localAssetUrl(filePath: string) {
-    return /^(?:data:|https?:|asset:)/i.test(filePath)
-        ? filePath
-        : convertFileSrc(filePath);
+    if (/^(?:data:|https?:|file:)/i.test(filePath)) return filePath;
+    const normalized = filePath.replace(/\\/g, "/");
+    return `file:///${encodeURI(normalized).replace(/^\/+/, "")}`;
 }
 
 function isAbsolutePath(filePath: string) {
