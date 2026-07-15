@@ -13,7 +13,15 @@ await rm(path.join(dist, "icons"), { recursive: true, force: true });
 await cp(path.join(projectRoot, "icons"), path.join(dist, "icons"), { recursive: true });
 await rm(path.join(dist, "l10n"), { recursive: true, force: true });
 await cp(path.join(projectRoot, "l10n"), path.join(dist, "l10n"), { recursive: true });
-await rm(path.join(dist, "bin"), { recursive: true, force: true });
-await cp(path.join(projectRoot, "bin"), path.join(dist, "bin"), { recursive: true });
+try {
+    await rm(path.join(dist, "bin"), { recursive: true, force: true });
+    await cp(path.join(projectRoot, "bin"), path.join(dist, "bin"), { recursive: true });
+} catch (error) {
+    if (error?.code === "EPERM" || error?.code === "EBUSY") {
+        console.warn("worker is in use; keeping the existing dist/bin until the next build");
+    } else {
+        throw error;
+    }
+}
 
 console.log(`prepared Pixcall plugin at ${dist}`);

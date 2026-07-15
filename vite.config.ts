@@ -10,6 +10,7 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    emptyOutDir: true,
+    // Keep a running plugin's worker directory from being removed mid-build.
+    emptyOutDir: false,
   },
 });
