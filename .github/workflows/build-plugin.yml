@@ -1,0 +1,106 @@
+name: Build Pixcall Plugin
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build Windows x64 plugin
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Upload Windows plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixcall-plugin-windows
+          path: dist
+          if-no-files-found: error
+
+  build-macos-arm64:
+    name: Build macOS ARM64 plugin
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Upload macOS ARM64 plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixcall-plugin-macos-arm64
+          path: dist
+          if-no-files-found: error
+
+  package:
+    name: Package cross-platform plugin
+    runs-on: ubuntu-latest
+    needs:
+      - build-windows
+      - build-macos-arm64
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pixcall-plugin-windows
+          path: artifacts/windows
+
+      - name: Download macOS ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pixcall-plugin-macos-arm64
+          path: artifacts/macos
+
+      - name: Merge platform workers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-dist/bin
+          cp -a artifacts/windows/. release-dist/
+          cp -a artifacts/macos/bin/mac-arm64 release-dist/bin/
+          test -f release-dist/bin/win-x64/ai-worker.exe
+          test -x release-dist/bin/mac-arm64/ai-worker
+          test -f release-dist/manifest.json
+
+      - name: Upload release plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixcall-plugin
+          path: release-dist
+          if-no-files-found: error

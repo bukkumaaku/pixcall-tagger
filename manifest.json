@@ -25,7 +25,11 @@
     "commands": [
       {
         "command": "ai-tagger",
-        "title": "AI 自动标签"
+        "title": "AI 自动标签",
+        "icon": {
+          "light": "icon.png",
+          "dark": "icon.png"
+        }
       }
     ],
     "context_menus": [
