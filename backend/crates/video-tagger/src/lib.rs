@@ -146,7 +146,9 @@ fn validate_request(request: &TagVideoRequest) -> Result<(), VideoTaggerError> {
 }
 
 fn probe_duration(ffprobe_path: &str, video_path: &str) -> Result<f64, VideoTaggerError> {
-    let output = Command::new(ffprobe_path)
+    let mut command = Command::new(ffprobe_path);
+    hide_console(&mut command);
+    let output = command
         .args([
             "-v",
             "error",
@@ -188,7 +190,9 @@ fn extract_frame(
     destination: &Path,
 ) -> Result<(), VideoTaggerError> {
     let timestamp = format!("{timestamp_seconds:.6}");
-    let output = Command::new(ffmpeg_path)
+    let mut command = Command::new(ffmpeg_path);
+    hide_console(&mut command);
+    let output = command
         .args([
             "-hide_banner",
             "-loglevel",
@@ -215,6 +219,17 @@ fn extract_frame(
     }
     Ok(())
 }
+
+#[cfg(windows)]
+fn hide_console(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console(_: &mut Command) {}
 
 fn frame_timestamps(duration_seconds: f64, frame_count: usize) -> Vec<f64> {
     if frame_count == 1 {

@@ -12,7 +12,9 @@ pub fn handle(_: SystemToolsRequest) -> HandlerResult<SystemToolsResult> {
 }
 
 fn available_on_path(command: &str) -> Option<String> {
-    Command::new(command)
+    let mut process = Command::new(command);
+    hide_console(&mut process);
+    process
         .arg("-version")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -22,6 +24,17 @@ fn available_on_path(command: &str) -> Option<String> {
         .filter(|status| status.success())
         .map(|_| command.to_string())
 }
+
+#[cfg(windows)]
+fn hide_console(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console(_: &mut Command) {}
 
 #[cfg(test)]
 mod tests {
