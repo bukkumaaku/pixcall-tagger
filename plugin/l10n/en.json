@@ -33,6 +33,21 @@
         "confirm": "Process",
         "reset": "Restore Defaults"
     },
+    "nav": {
+        "wd": "WD Model Tagging",
+        "llm": "LLM Image Understanding",
+        "semantic_search": "Semantic Search",
+        "settings": "Settings"
+    },
+    "window": {
+        "minimize": "Minimize",
+        "close": "Close"
+    },
+    "startup": {
+        "model_location_title": "Error",
+        "model_location_required": "The model directory is not configured. Choose a directory for the model files.",
+        "unsupported_platform": "Pixcall AI Tagger currently supports Windows x64 or macOS ARM64"
+    },
     "update": {
         "title": "Update available",
         "current_version": "Current version: ",

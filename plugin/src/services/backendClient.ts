@@ -43,7 +43,7 @@ import {
     type EmbeddingUnloadResult,
     createRequest,
 } from "../protocol";
-import { ensureWorker, shutdownWorker, workerRequest } from "./pixcallBridge";
+import { ensureWorker, workerRequest } from "./pixcallBridge";
 
 export class BackendClientError extends Error {
     readonly code: string;
@@ -311,9 +311,6 @@ export class BackendClient {
 
     dispose() {
         this.running = false;
-        void shutdownWorker().catch((error) => {
-            console.warn("Failed to stop ai-worker", error);
-        });
     }
 
     private async request<K extends CommandType>(
@@ -324,11 +321,14 @@ export class BackendClient {
         this.start();
         const requestId = `r-${Date.now()}-${++this.sequence}`;
         const request = createRequest(requestId, type, payload);
-        const messages = await workerRequest(request);
+        const messages = await workerRequest(request, (message) => {
+            if (message.protocolVersion === PROTOCOL_VERSION && message.type === "progress") {
+                onProgress?.(message.payload);
+            }
+        });
         for (const message of messages) {
             if (message.protocolVersion !== PROTOCOL_VERSION) continue;
             if (message.type === "progress") {
-                onProgress?.(message.payload);
                 continue;
             }
             if (message.type === "error") {

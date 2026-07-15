@@ -28,6 +28,8 @@ declare global {
         eagle: typeof eagle;
         pixcall?: {
             getContext(name: "settings" | "serverPort" | "initMessage"): Promise<unknown>;
+            showOpenDialog(options: { properties?: string[] }): Promise<{ canceled: boolean; filePaths: string[] }>;
+            platform: { isMacOS: boolean; isWindows: boolean; isLinux: boolean };
         };
     }
 }

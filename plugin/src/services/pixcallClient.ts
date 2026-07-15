@@ -76,6 +76,9 @@ class PixcallClient {
 
     async getSelectedItems() {
         await this.getSettings();
+        const entries = await this.request<PixcallEntry[]>({ type: "get_selected_entries" });
+        if (entries?.length) return this.hydrateEntries(entries);
+
         const initMessage = await getPixcallContext<{ data?: { selection?: string[] } }>("initMessage");
         const selection = initMessage?.data?.selection?.map(normalizeId) || [];
         if (selection.length > 0) {
@@ -85,8 +88,7 @@ class PixcallClient {
             });
             return this.hydrateEntries(result.entries || []);
         }
-        const entries = await this.request<PixcallEntry[]>({ type: "get_selected_entries" });
-        return this.hydrateEntries(entries || []);
+        return [];
     }
 
     async getAllItems() {
@@ -111,17 +113,34 @@ class PixcallClient {
     }
 
     async getItem(id: string) {
-        const cached = this.entries.get(id);
+        const normalizedId = normalizeId(id);
+        const cached = this.entries.get(normalizedId);
         if (cached) return this.hydrateEntry(cached);
-        const entries = await this.getSelectedItems();
-        const item = entries.find((candidate) => candidate.id === id);
+        const items = await this.getItems([normalizedId]);
+        const item = items[0];
         if (!item) throw new Error(`Pixcall 中找不到条目 ${id}`);
         return item;
     }
 
     async getItems(ids: string[]) {
-        const resolved = await Promise.all(ids.map((id) => this.getItem(id).catch(() => null)));
-        return resolved.filter((item): item is PixcallItem => item !== null);
+        const normalizedIds = ids.map(normalizeId);
+        const missingIds = [...new Set(normalizedIds.filter((id) => !this.entries.has(id)))];
+        for (let offset = 0; offset < missingIds.length; offset += 500) {
+            const result = await this.request<EntryListResponse>({
+                type: "get_entries",
+                ids: missingIds.slice(offset, offset + 500),
+            });
+            for (const entry of result.entries || []) {
+                this.entries.set(normalizeId(entry.id), entry);
+            }
+        }
+        const hydrated = await Promise.all(
+            normalizedIds.map((id) => {
+                const entry = this.entries.get(id);
+                return entry ? this.hydrateEntry(entry) : null;
+            }),
+        );
+        return hydrated.filter((item): item is PixcallItem => item !== null);
     }
 
     async openItem(id: string) {
@@ -242,9 +261,11 @@ export function installPixcallHost() {
             open: (id: string) => pixcallClient.openItem(id),
         },
         dialog: {
-            showOpenDialog: async (_options: { properties?: string[] }) => {
-                const selected = window.prompt("请输入完整目录路径", "E:\\models")?.trim() || "";
-                return { canceled: !selected, filePaths: selected ? [selected] : [] };
+            showOpenDialog: async (options: { properties?: string[] }) => {
+                if (!window.pixcall?.showOpenDialog) {
+                    throw new Error("当前 Pixcall 版本未提供目录选择器");
+                }
+                return window.pixcall.showOpenDialog(options);
             },
         },
         extraModule: {
@@ -266,7 +287,7 @@ export function installPixcallHost() {
             minimize: async () => undefined,
             hide: async () => undefined,
         },
-        shell: { openExternal: async (url: string) => { window.open(url, "_blank", "noopener"); } },
+        shell: { openExternal: async (url: string) => { await pixcallCommand({ type: "open_url", url }); } },
     };
     (globalThis as typeof globalThis & { eagle: typeof host }).eagle = host;
     (window as typeof window & { eagle: typeof host }).eagle = host;

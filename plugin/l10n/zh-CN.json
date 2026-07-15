@@ -33,6 +33,21 @@
         "confirm": "确认",
         "reset": "恢复默认"
     },
+    "nav": {
+        "wd": "WD 模型打标签",
+        "llm": "LLM 图像理解",
+        "semantic_search": "语义搜索",
+        "settings": "设置"
+    },
+    "window": {
+        "minimize": "最小化",
+        "close": "关闭"
+    },
+    "startup": {
+        "model_location_title": "错误",
+        "model_location_required": "未设置模型文件路径。点击确认后请选择一个位置安置模型文件。",
+        "unsupported_platform": "Pixcall AI 自动标签目前仅支持 Windows x64 或 macOS ARM64"
+    },
     "update": {
         "title": "发现新版本",
         "current_version": "当前版本：",

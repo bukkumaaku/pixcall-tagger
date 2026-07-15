@@ -1,5 +1,6 @@
 import type { CommandType, WorkerMessage, WorkerRequest } from "../protocol";
 import { dirname, joinPath } from "./pathUtils";
+import { translate } from "./i18n";
 
 const WORKER_PORT = 22511;
 const WORKER_TOKEN = "pixcall-ai-tagger-v1";
@@ -60,8 +61,17 @@ export async function ensureWorker() {
 
 async function startWorker() {
     if (await workerHealth()) return;
+    await shutdownIncompatibleWorker();
+    const platform = window.pixcall?.platform;
+    const workerDirectory = platform?.isWindows
+        ? "win-x64"
+        : platform?.isMacOS
+            ? "mac-arm64"
+            : "";
+    const workerExecutable = platform?.isWindows ? "ai-worker.exe" : "ai-worker";
+    if (!workerDirectory) throw new Error(translate("startup.unsupported_platform"));
     const root = pluginRootPath();
-    const command = joinPath(root, "bin", "win-x64", "ai-worker.exe");
+    const command = joinPath(root, "bin", workerDirectory, workerExecutable);
     await pixcallRequest({
         type: "spawn_child_process",
         command,
@@ -78,15 +88,36 @@ async function startWorker() {
 async function workerHealth() {
     try {
         const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/health`);
-        return response.ok;
+        if (!response.ok) return false;
+        const health = await response.json() as { streaming?: boolean };
+        return health.streaming === true;
     } catch {
         return false;
     }
 }
 
-export async function workerRequest<K extends CommandType>(request: WorkerRequest<K>): Promise<WorkerMessage[]> {
+async function shutdownIncompatibleWorker() {
+    try {
+        const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/health`);
+        if (!response.ok) return;
+        const health = await response.json() as { streaming?: boolean };
+        if (health.streaming === true) return;
+        await fetch(`http://127.0.0.1:${WORKER_PORT}/shutdown`, {
+            method: "POST",
+            headers: { "X-Pixcall-AI-Token": WORKER_TOKEN },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 300));
+    } catch {
+        // No worker is listening on the configured port.
+    }
+}
+
+export async function workerRequest<K extends CommandType>(
+    request: WorkerRequest<K>,
+    onMessage?: (message: WorkerMessage) => void,
+): Promise<WorkerMessage[]> {
     await ensureWorker();
-    const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/request`, {
+    const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/request-stream`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -95,8 +126,35 @@ export async function workerRequest<K extends CommandType>(request: WorkerReques
         body: JSON.stringify(request),
     });
     if (!response.ok) throw new Error(`ai-worker HTTP ${response.status}: ${await response.text()}`);
-    const envelope = (await response.json()) as { messages: WorkerMessage[] };
-    return envelope.messages;
+    if (!response.body) throw new Error("ai-worker HTTP response has no body");
+
+    const messages: WorkerMessage[] = [];
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        let newline = buffer.indexOf("\n");
+        while (newline >= 0) {
+            const line = buffer.slice(0, newline).trim();
+            buffer = buffer.slice(newline + 1);
+            if (line) {
+                const message = JSON.parse(line) as WorkerMessage;
+                messages.push(message);
+                onMessage?.(message);
+            }
+            newline = buffer.indexOf("\n");
+        }
+        if (done) break;
+    }
+    const tail = buffer.trim();
+    if (tail) {
+        const message = JSON.parse(tail) as WorkerMessage;
+        messages.push(message);
+        onMessage?.(message);
+    }
+    return messages;
 }
 
 export async function shutdownWorker() {

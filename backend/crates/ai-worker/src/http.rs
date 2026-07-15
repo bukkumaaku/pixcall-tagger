@@ -35,6 +35,21 @@ struct CollectedEvents {
     messages: Vec<Response>,
 }
 
+struct StreamingEvents<'a> {
+    request_id: String,
+    stream: &'a mut TcpStream,
+}
+
+impl EventEmitter for StreamingEvents<'_> {
+    fn progress(&mut self, payload: protocol::ProgressPayload) -> HandlerResult<()> {
+        write_ndjson(
+            self.stream,
+            &Response::progress(self.request_id.clone(), payload),
+        )
+        .map_err(|error| HandlerError::new("HTTP_STREAM_FAILED", error.to_string()))
+    }
+}
+
 impl EventEmitter for CollectedEvents {
     fn progress(&mut self, payload: protocol::ProgressPayload) -> HandlerResult<()> {
         self.messages
@@ -87,7 +102,11 @@ fn handle_connection<H: CommandHandler>(
         return Ok(false);
     }
     if request.path == "/health" {
-        write_json(&mut stream, 200, &serde_json::json!({ "ok": true }))?;
+        write_json(
+            &mut stream,
+            200,
+            &serde_json::json!({ "ok": true, "streaming": true }),
+        )?;
         return Ok(false);
     }
     if request.token != expected_token {
@@ -101,6 +120,26 @@ fn handle_connection<H: CommandHandler>(
     if request.path == "/shutdown" {
         write_json(&mut stream, 200, &serde_json::json!({ "ok": true }))?;
         return Ok(true);
+    }
+    if request.method == "POST" && request.path == "/request-stream" {
+        write_stream_headers(&mut stream)?;
+        let response = match serde_json::from_slice::<Request>(&request.body) {
+            Ok(request) => {
+                let request_id = request.request_id.clone();
+                let mut events = StreamingEvents {
+                    request_id,
+                    stream: &mut stream,
+                };
+                dispatch::dispatch(request, handlers, &mut events)
+            }
+            Err(error) => Response::error(
+                None,
+                error_codes::BAD_MESSAGE,
+                format!("Failed to parse JSON: {error}"),
+            ),
+        };
+        write_ndjson(&mut stream, &response)?;
+        return Ok(false);
     }
     if request.method != "POST" || request.path != "/request" {
         write_json(
@@ -132,6 +171,22 @@ fn handle_connection<H: CommandHandler>(
     }
     write_json(&mut stream, 200, &MessageEnvelope { messages })?;
     Ok(false)
+}
+
+fn write_stream_headers(stream: &mut TcpStream) -> Result<(), HttpServerError> {
+    write!(
+        stream,
+        "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: content-type,x-pixcall-ai-token\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nConnection: close\r\n\r\n"
+    )?;
+    stream.flush()?;
+    Ok(())
+}
+
+fn write_ndjson(stream: &mut TcpStream, value: &impl Serialize) -> Result<(), HttpServerError> {
+    serde_json::to_writer(&mut *stream, value)?;
+    stream.write_all(b"\n")?;
+    stream.flush()?;
+    Ok(())
 }
 
 fn read_request(stream: &TcpStream) -> Result<HttpRequest, std::io::Error> {

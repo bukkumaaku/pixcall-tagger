@@ -1,5 +1,8 @@
 use protocol::{MinimizePluginWindowRequest, MinimizePluginWindowResult};
 
+#[cfg(target_os = "macos")]
+use std::process::Command;
+
 use super::HandlerResult;
 
 #[cfg(windows)]
@@ -51,5 +54,17 @@ unsafe extern "system" fn find_and_minimize(window: HWND, state: LPARAM) -> i32 
 
 #[cfg(not(windows))]
 fn minimize_tagger_window() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        return Command::new("osascript")
+            .args([
+                "-e",
+                "tell application \"System Events\" to tell (first application process whose frontmost is true) to set value of attribute \"AXMinimized\" of front window to true",
+            ])
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+    }
+    #[cfg(not(target_os = "macos"))]
     false
 }
