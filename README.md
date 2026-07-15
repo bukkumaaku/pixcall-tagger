@@ -66,11 +66,12 @@ Windows 下 WD 和本地 embedding 默认优先使用 DirectML，macOS 默认优
 
 插件最低需要 Pixcall `0.9.5`。
 
-1. 从 GitHub Actions 的 `pixcall-plugin` artifact 下载并解压，或从源码执行 `npm run build`。
-2. 打开 Pixcall 的插件管理器。
-3. 选择“加载插件文件夹”。
-4. 选择构建后的 `dist` 文件夹。
-5. 启用“AI 自动标签”插件。
+1. 打开 [GitHub Releases](https://github.com/bukkumaaku/pixcall-tagger/releases/latest)。
+2. 下载已经编译好的 `pixcall-plugin-v2.0.1.zip`。
+3. 解压压缩包。
+4. 打开 Pixcall 的插件管理器，选择“加载插件文件夹”。
+5. 选择解压后的 `release-dist` 文件夹，也就是直接包含 `manifest.json` 的文件夹。
+6. 启用“AI 自动标签”插件。
 
 大型模型文件不包含在插件包中。安装后在设置中选择模型根目录，再下载或手动放置模型。
 
@@ -168,7 +169,7 @@ Rust 测试：
 cargo test --manifest-path backend/Cargo.toml --workspace
 ```
 
-GitHub Actions 推送 `main` 会构建 Windows x64 和 macOS ARM64；推送 `v*` 标签会构建并合并跨平台 `pixcall-plugin` artifact。当前标签示例：`v2.0.1`。
+GitHub Actions 推送 `main` 会构建 Windows x64 和 macOS ARM64；推送 `v*` 标签会构建跨平台插件，并将 zip 安装包发布到 GitHub Releases。当前标签示例：`v2.0.1`。
 
 ## 项目结构
 

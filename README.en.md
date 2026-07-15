@@ -66,11 +66,12 @@ WD and local embedding inference use DirectML first on Windows and CoreML first 
 
 Pixcall `0.9.5` or newer is required.
 
-1. Download and extract the `pixcall-plugin` artifact from GitHub Actions, or run `npm run build` from source.
-2. Open Pixcall's plugin manager.
-3. Choose **Load Plugin Folder**.
-4. Select the generated `dist` directory.
-5. Enable the **AI Tagger** plugin.
+1. Open [GitHub Releases](https://github.com/bukkumaaku/pixcall-tagger/releases/latest).
+2. Download the prebuilt `pixcall-plugin-v2.0.1.zip` package.
+3. Extract the archive.
+4. Open Pixcall's plugin manager and choose **Load Plugin Folder**.
+5. Select the extracted `release-dist` directory, which directly contains `manifest.json`.
+6. Enable the **AI Tagger** plugin.
 
 Large model files are not included in the plugin package. Select a model root in Settings and download or place the models manually.
 
@@ -168,7 +169,7 @@ Rust tests:
 cargo test --manifest-path backend/Cargo.toml --workspace
 ```
 
-GitHub Actions builds Windows x64 and macOS ARM64 when `main` is pushed. Pushing a `v*` tag builds and merges the cross-platform `pixcall-plugin` artifact. The current tag example is `v2.0.1`.
+GitHub Actions builds Windows x64 and macOS ARM64 when `main` is pushed. Pushing a `v*` tag builds the cross-platform plugin and publishes its zip package to GitHub Releases. The current tag example is `v2.0.1`.
 
 ## Project structure
 
