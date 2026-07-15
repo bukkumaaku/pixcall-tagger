@@ -4,7 +4,15 @@
 
 Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和 Rust `ai-worker`，为图片和视频生成标签、描述，并提供语义搜索。
 
-当前版本：`2.0.1`
+当前版本：`2.0.2`
+
+## 更新日志
+
+### `2.0.2`
+
+- 首次打开插件且未设置模型目录时，直接打开原生文件夹选择器。
+- 取消选择模型目录时改为轻量警告通知，不再弹出重复确认框。
+- 运行 LLM 前检查 llamafile，缺少运行程序时直接引导下载。
 
 ## 功能
 
@@ -67,7 +75,7 @@ Windows 下 WD 和本地 embedding 默认优先使用 DirectML，macOS 默认优
 插件最低需要 Pixcall `0.9.5`。
 
 1. 打开 [GitHub Releases](https://github.com/bukkumaaku/pixcall-tagger/releases/latest)。
-2. 下载已经编译好的 `pixcall-plugin-v2.0.1.zip`。
+2. 下载已经编译好的 `pixcall-plugin-v2.0.2.zip`。
 3. 解压压缩包。
 4. 打开 Pixcall 的插件管理器，选择“加载插件文件夹”。
 5. 选择解压后的 `release-dist` 文件夹，也就是直接包含 `manifest.json` 的文件夹。
@@ -169,7 +177,7 @@ Rust 测试：
 cargo test --manifest-path backend/Cargo.toml --workspace
 ```
 
-GitHub Actions 推送 `main` 会构建 Windows x64 和 macOS ARM64；推送 `v*` 标签会构建跨平台插件，并将 zip 安装包发布到 GitHub Releases。当前标签示例：`v2.0.1`。
+GitHub Actions 推送 `main` 会构建 Windows x64 和 macOS ARM64；推送 `v*` 标签会构建跨平台插件，并将 zip 安装包发布到 GitHub Releases。当前标签示例：`v2.0.2`。
 
 ## 项目结构
 
