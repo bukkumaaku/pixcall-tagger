@@ -60,6 +60,21 @@
         }
     }
 
+    async function chooseModelLocation() {
+        const result = await eagle.dialog.showOpenDialog({
+            properties: ["openDirectory"],
+        });
+
+        if (result.canceled || !result.filePaths?.[0]) {
+            notification(t.value("startup.model_location_required"), "warning");
+            return false;
+        }
+
+        config.modelLocation = result.filePaths[0];
+        await backenAPI.setConfig();
+        return true;
+    }
+
     const renderIcon = (icon: Component) => {
         return () => h(NIcon, null, { default: () => h(icon) });
     };
@@ -100,25 +115,10 @@
 
     onMounted(async () => {
         await backenAPI.getConfig();
-        if (config.modelLocation === "") {
-            dialog.error({
-                title: t.value("startup.model_location_title"),
-                content: t.value("startup.model_location_required"),
-                positiveText: "OK",
-                maskClosable: false,
-                closeOnEsc: false,
-                closable: false,
-                onPositiveClick: async () => {
-                    const result = await eagle.dialog.showOpenDialog({
-                        properties: ["openDirectory"],
-                    });
-                    if (!result.canceled && result.filePaths?.[0]) {
-                        config.modelLocation = result.filePaths[0];
-                        await backenAPI.setConfig();
-                        void checkForUpdate();
-                    }
-                },
-            });
+        if (!config.modelLocation) {
+            if (await chooseModelLocation()) {
+                void checkForUpdate();
+            }
         } else {
             void checkForUpdate();
         }
