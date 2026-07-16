@@ -111,6 +111,7 @@ export type EmbeddingIndexBatchRequest = {
 export type EmbeddingIndexTagsRequest = {
     sessionId: string;
     items: EmbeddingTagInput[];
+    concurrency: number;
 };
 
 export type EmbeddingPruneRequest = {
