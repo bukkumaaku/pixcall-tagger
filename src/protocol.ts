@@ -98,14 +98,28 @@ export type EmbeddingImageInput = {
     modifiedAt: number;
 };
 
+export type EmbeddingTagInput = {
+    itemId: string;
+    tags: string[];
+};
+
 export type EmbeddingIndexBatchRequest = {
     sessionId: string;
     images: EmbeddingImageInput[];
 };
 
+export type EmbeddingIndexTagsRequest = {
+    sessionId: string;
+    items: EmbeddingTagInput[];
+};
+
 export type EmbeddingPruneRequest = {
     sessionId: string;
     itemIds: string[];
+};
+
+export type EmbeddingPruneTagsRequest = {
+    sessionId: string;
 };
 
 export type EmbeddingHealthRequest = {
@@ -121,6 +135,7 @@ export type EmbeddingSearchTextRequest = {
     sessionId: string;
     text: string;
     topK: number;
+    includeTags?: boolean;
 };
 
 export type EmbeddingSearchImageRequest = {
@@ -224,7 +239,9 @@ export type CommandPayloadMap = {
     scan_embedding_models: ScanEmbeddingModelsRequest;
     embedding_load: EmbeddingLoadRequest;
     embedding_index_batch: EmbeddingIndexBatchRequest;
+    embedding_index_tags: EmbeddingIndexTagsRequest;
     embedding_prune: EmbeddingPruneRequest;
+    embedding_prune_tags: EmbeddingPruneTagsRequest;
     embedding_health: EmbeddingHealthRequest;
     embedding_status: EmbeddingStatusRequest;
     embedding_search_text: EmbeddingSearchTextRequest;
@@ -336,6 +353,8 @@ export type EmbeddingLoadResult = {
     sessionId: string;
     modelKey: string;
     indexedCount: number;
+    tagIndexedCount: number;
+    tagLinkCount: number;
     reused: boolean;
 };
 
@@ -353,10 +372,31 @@ export type EmbeddingIndexBatchResult = {
     totalIndexed: number;
 };
 
+export type EmbeddingTagFailure = {
+    tag: string;
+    error: string;
+};
+
+export type EmbeddingIndexTagsResult = {
+    sessionId: string;
+    indexedTags: number;
+    skippedTags: number;
+    totalTags: number;
+    totalLinks: number;
+    failures: EmbeddingTagFailure[];
+};
+
 export type EmbeddingPruneResult = {
     sessionId: string;
     removedCount: number;
     totalIndexed: number;
+};
+
+export type EmbeddingPruneTagsResult = {
+    sessionId: string;
+    removedTags: number;
+    totalTags: number;
+    totalLinks: number;
 };
 
 export type EmbeddingHealthItem = {
@@ -377,6 +417,8 @@ export type EmbeddingStatusResult = {
     sessionId: string;
     modelKey: string;
     indexedCount: number;
+    tagIndexedCount: number;
+    tagLinkCount: number;
 };
 
 export type EmbeddingSearchHit = {
@@ -481,7 +523,9 @@ export type ResultDataMap = {
     scan_embedding_models: ScanEmbeddingModelsResult;
     embedding_load: EmbeddingLoadResult;
     embedding_index_batch: EmbeddingIndexBatchResult;
+    embedding_index_tags: EmbeddingIndexTagsResult;
     embedding_prune: EmbeddingPruneResult;
+    embedding_prune_tags: EmbeddingPruneTagsResult;
     embedding_health: EmbeddingHealthResult;
     embedding_status: EmbeddingStatusResult;
     embedding_search_text: EmbeddingSearchResult;
