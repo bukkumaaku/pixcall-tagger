@@ -235,6 +235,7 @@
                 Math.max(128, Number(config.embeddingDimension) || 1536),
             );
             await refreshModels();
+            await refreshIndexStatus();
             await persistSettings();
             isReady.value = true;
         } catch (error) {
@@ -254,6 +255,9 @@
 
     watch([selectedModel, batchSize], () => {
         if (isReady.value) void persistSettings();
+    });
+    watch(selectedModel, () => {
+        if (isReady.value) void refreshIndexStatus();
     });
     watch(batchFieldMax, (maximum) => {
         if (batchSize.value > maximum) batchSize.value = maximum;
@@ -359,6 +363,31 @@
             }
         } finally {
             isLoadingModels.value = false;
+        }
+    }
+
+    async function refreshIndexStatus() {
+        const model = selectedModelInfo.value;
+        if (!model || !config.modelLocation) return;
+        const databasePath = joinPath(
+            config.modelLocation,
+            "embedding",
+            INDEX_FILENAME,
+        );
+        const namespace = String(eagle.library.path || eagle.library.name || "default");
+        try {
+            const status = await getBackendClient().embeddingStatus(SESSION_ID, {
+                databasePath,
+                namespace,
+                modelKey: model.modelKey,
+                dimension: model.dimension,
+            });
+            indexedCount.value = status.indexedCount;
+            tagIndexedCount.value = status.tagIndexedCount;
+            tagLinkCount.value = status.tagLinkCount;
+        } catch {
+            tagIndexedCount.value = 0;
+            tagLinkCount.value = 0;
         }
     }
 

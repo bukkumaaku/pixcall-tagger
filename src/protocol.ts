@@ -130,6 +130,10 @@ export type EmbeddingHealthRequest = {
 
 export type EmbeddingStatusRequest = {
     sessionId: string;
+    databasePath?: string;
+    namespace?: string;
+    modelKey?: string;
+    dimension?: number;
 };
 
 export type EmbeddingSearchTextRequest = {
