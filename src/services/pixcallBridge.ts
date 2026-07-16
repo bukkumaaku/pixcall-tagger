@@ -2,8 +2,10 @@ import type { CommandType, WorkerMessage, WorkerRequest } from "../protocol";
 import { dirname, joinPath } from "./pathUtils";
 import { translate } from "./i18n";
 
-const WORKER_PORT = 22511;
-const WORKER_TOKEN = "pixcall-ai-tagger-v1";
+// Use a revisioned endpoint so an older worker cannot be mistaken for the
+// current protocol implementation after the plugin is upgraded.
+const WORKER_PORT = 22512;
+const WORKER_TOKEN = "pixcall-ai-tagger-v2";
 let pixcallBaseUrl = "";
 let workerReady: Promise<void> | null = null;
 
