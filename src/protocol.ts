@@ -358,6 +358,7 @@ export type EmbeddingLoadResult = {
     sessionId: string;
     modelKey: string;
     indexedCount: number;
+    tagDocumentCount: number;
     tagIndexedCount: number;
     tagLinkCount: number;
     reused: boolean;
@@ -422,6 +423,7 @@ export type EmbeddingStatusResult = {
     sessionId: string;
     modelKey: string;
     indexedCount: number;
+    tagDocumentCount: number;
     tagIndexedCount: number;
     tagLinkCount: number;
 };

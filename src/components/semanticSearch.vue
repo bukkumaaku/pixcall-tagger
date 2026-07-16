@@ -104,6 +104,7 @@
     const loadedSignature = ref("");
     const loadedModelKey = ref("");
     const indexedCount = ref(0);
+    const tagDocumentCount = ref(0);
     const tagIndexedCount = ref(0);
     const tagLinkCount = ref(0);
     const isTagIndexing = ref(false);
@@ -116,6 +117,8 @@
     const pauseRequested = ref(false);
     const isPaused = ref(false);
     const totalImages = ref(0);
+    const libraryTagCount = ref(0);
+    const libraryCountsReady = ref(false);
     const processedImages = ref(0);
     const indexedThisRun = ref(0);
     const skippedThisRun = ref(0);
@@ -207,6 +210,15 @@
     const isSearchResultCapped = computed(
         () => indexedCount.value > MAX_SEARCH_RESULTS,
     );
+    const imagePendingCount = computed(() =>
+        Math.max(totalImages.value - indexedCount.value, 0),
+    );
+    const tagTotalCount = computed(() =>
+        libraryCountsReady.value ? libraryTagCount.value : tagDocumentCount.value,
+    );
+    const tagPendingCount = computed(() =>
+        Math.max(tagTotalCount.value - tagIndexedCount.value, 0),
+    );
     const canIncludeTags = computed(
         () => tagIndexedCount.value > 0 && tagLinkCount.value > 0,
     );
@@ -236,6 +248,11 @@
             );
             await refreshModels();
             await refreshIndexStatus();
+            try {
+                await refreshLibraryCounts();
+            } catch {
+                libraryCountsReady.value = false;
+            }
             await persistSettings();
             isReady.value = true;
         } catch (error) {
@@ -383,9 +400,12 @@
                 dimension: model.dimension,
             });
             indexedCount.value = status.indexedCount;
+            tagDocumentCount.value = status.tagDocumentCount;
             tagIndexedCount.value = status.tagIndexedCount;
             tagLinkCount.value = status.tagLinkCount;
         } catch {
+            indexedCount.value = 0;
+            tagDocumentCount.value = 0;
             tagIndexedCount.value = 0;
             tagLinkCount.value = 0;
         }
@@ -444,6 +464,7 @@
                 model.provider === "gemini" ? model.dimension : 0,
             );
             indexedCount.value = result.indexedCount;
+            tagDocumentCount.value = result.tagDocumentCount;
             tagIndexedCount.value = result.tagIndexedCount;
             tagLinkCount.value = result.tagLinkCount;
             loadedSignature.value = signature;
@@ -486,6 +507,24 @@
         );
     }
 
+    function applyLibraryCounts(images: PixcallImage[]) {
+        totalImages.value = images.length;
+        tagTotalItems.value = images.length;
+        const tags = new Set<string>();
+        for (const image of images) {
+            for (const tag of Array.isArray(image.tags) ? image.tags : []) {
+                const normalized = String(tag).trim();
+                if (normalized) tags.add(normalized);
+            }
+        }
+        libraryTagCount.value = tags.size;
+        libraryCountsReady.value = true;
+    }
+
+    async function refreshLibraryCounts() {
+        applyLibraryCounts(await getLibraryImages());
+    }
+
     function toEmbeddingInput(item: PixcallImage): EmbeddingImageInput {
         return {
             id: item.id,
@@ -519,6 +558,7 @@
             updateTask(taskId, { detail: "正在加载模型" });
             await ensureSession();
             const images = await getLibraryImages();
+            applyLibraryCounts(images);
             if (images.length === 0) {
                 throw new Error("没有找到可索引的图片，已保留现有索引");
             }
@@ -614,6 +654,7 @@
         try {
             await ensureSession();
             const images = await getLibraryImages();
+            applyLibraryCounts(images);
             if (images.length === 0) throw new Error("没有找到可处理的图片");
             tagTotalItems.value = images.length;
             tagProcessedItems.value = 0;
@@ -698,6 +739,7 @@
             updateTask(taskId, { detail: "正在比对 Pixcall 图片与索引" });
             await ensureSession();
             const images = await getLibraryImages();
+            applyLibraryCounts(images);
             healthResult.value = await getBackendClient().embeddingHealth(
                 SESSION_ID,
                 images.map((image) => image.id),
@@ -1031,12 +1073,12 @@
                             <strong>{{ totalImages }}</strong>
                         </div>
                         <div class="metric metric--green">
-                            <span>本次新增</span>
-                            <strong>{{ indexedThisRun }}</strong>
+                            <span>已向量化</span>
+                            <strong>{{ indexedCount }}</strong>
                         </div>
                         <div class="metric">
-                            <span>已跳过</span>
-                            <strong>{{ skippedThisRun }}</strong>
+                            <span>待向量化</span>
+                            <strong>{{ imagePendingCount }}</strong>
                         </div>
                         <div class="metric metric--red">
                             <span>失败</span>
@@ -1153,9 +1195,9 @@
             <n-tab-pane name="tag-index" tab="标签向量化">
                 <section class="index-panel">
                     <div class="metrics-row">
-                        <div class="metric"><span>总图片</span><strong>{{ tagTotalItems }}</strong></div>
-                        <div class="metric metric--green"><span>已处理</span><strong>{{ tagProcessedItems }}</strong></div>
-                        <div class="metric"><span>标签数量</span><strong>{{ tagIndexedCount }}</strong></div>
+                        <div class="metric"><span>总标签</span><strong>{{ tagTotalCount }}</strong></div>
+                        <div class="metric metric--green"><span>已向量化</span><strong>{{ tagIndexedCount }}</strong></div>
+                        <div class="metric"><span>待向量化</span><strong>{{ tagPendingCount }}</strong></div>
                         <div class="metric metric--red"><span>失败</span><strong>{{ tagIndexFailures.length }}</strong></div>
                     </div>
                     <div class="progress-block">

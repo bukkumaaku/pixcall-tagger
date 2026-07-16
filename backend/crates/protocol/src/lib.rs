@@ -515,6 +515,7 @@ pub struct EmbeddingLoadResult {
     pub session_id: String,
     pub model_key: String,
     pub indexed_count: u64,
+    pub tag_document_count: u64,
     pub tag_indexed_count: u64,
     pub tag_link_count: u64,
     pub reused: bool,
@@ -597,6 +598,7 @@ pub struct EmbeddingStatusResult {
     pub session_id: String,
     pub model_key: String,
     pub indexed_count: u64,
+    pub tag_document_count: u64,
     pub tag_indexed_count: u64,
     pub tag_link_count: u64,
 }
