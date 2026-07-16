@@ -1,16 +1,4 @@
-type NodeRequire = (moduleName: string) => any;
-
-const nodeRequire = (globalThis as typeof globalThis & { require?: NodeRequire }).require;
-
-function getNodeModules() {
-    if (!nodeRequire) {
-        throw new Error("当前 Pixcall 插件环境不支持本地备份文件操作");
-    }
-    return {
-        fs: nodeRequire("node:fs"),
-        path: nodeRequire("node:path"),
-    };
-}
+import { getBackendClient } from "./backendClient";
 
 export type TaggerBackupItem = {
     id: string;
@@ -34,22 +22,21 @@ export type TaggerBackupOption = {
 };
 
 const backupDirectory = (modelFilePath: string) => {
-    const { path } = getNodeModules();
-    return path.join(path.dirname(modelFilePath), "backup");
+    const separator = modelFilePath.includes("\\") ? "\\" : "/";
+    const index = Math.max(modelFilePath.lastIndexOf("/"), modelFilePath.lastIndexOf("\\"));
+    const parent = index >= 0 ? modelFilePath.slice(0, index) : modelFilePath;
+    return `${parent}${separator}backup`;
 };
 
 const safeOperationName = (operation: TaggerBackup["operation"]) =>
     operation.replace(/[^a-z0-9-]/gi, "-");
 
-export function createTaggerBackup(
+export async function createTaggerBackup(
     modelFilePath: string,
     operation: TaggerBackup["operation"],
     items: any[],
-): string {
+): Promise<string> {
     if (!modelFilePath.trim()) throw new Error("模型路径为空，无法创建备份");
-    const { fs, path } = getNodeModules();
-    const directory = backupDirectory(modelFilePath);
-    fs.mkdirSync(directory, { recursive: true });
     const createdAt = new Date().toISOString();
     const stamp = createdAt.replace(/[:.]/g, "-");
     const suffix = Math.random().toString(36).slice(2, 8);
@@ -67,34 +54,31 @@ export function createTaggerBackup(
             annotation: String(item.annotation || ""),
         })),
     };
-    const target = path.join(directory, filename);
-    fs.writeFileSync(target, JSON.stringify(backup, null, 2), "utf8");
-    return target;
+    const result = await getBackendClient().writeBackup(
+        backupDirectory(modelFilePath),
+        filename,
+        JSON.stringify(backup, null, 2),
+    );
+    return result.path;
 }
 
-export function listTaggerBackups(modelFilePath: string): TaggerBackupOption[] {
+export async function listTaggerBackups(modelFilePath: string): Promise<TaggerBackupOption[]> {
     if (!modelFilePath.trim()) return [];
-    const { fs, path } = getNodeModules();
-    const directory = backupDirectory(modelFilePath);
-    if (!fs.existsSync(directory)) return [];
-    return fs
-        .readdirSync(directory, { withFileTypes: true })
-        .filter((entry: any) => entry.isFile() && entry.name.toLowerCase().endsWith(".json"))
-        .map((entry: any) => {
-            const value = path.join(directory, entry.name);
+    const result = await getBackendClient().listBackups(backupDirectory(modelFilePath));
+    const options = await Promise.all(result.entries.map(async (entry) => {
             try {
-                const backup = readBackup(value);
+                const backup = await readBackup(entry.path);
                 return {
                     label: `${backup.createdAt} · ${backup.operation} · ${backup.items.length} 项`,
-                    value,
+                    value: entry.path,
                     createdAt: backup.createdAt,
                     itemCount: backup.items.length,
                 } satisfies TaggerBackupOption;
             } catch {
                 return null;
             }
-        })
-        .filter((item: TaggerBackupOption | null): item is TaggerBackupOption => item !== null)
+        }));
+    return options.filter((item): item is TaggerBackupOption => item !== null)
         .sort((left: TaggerBackupOption, right: TaggerBackupOption) =>
             right.createdAt.localeCompare(left.createdAt),
         );
@@ -104,7 +88,7 @@ export async function restoreTaggerBackup(
     backupPath: string,
     getItemById: (id: string) => Promise<any>,
 ): Promise<{ restored: number; skipped: number }> {
-    const backup = readBackup(backupPath);
+    const backup = await readBackup(backupPath);
     let restored = 0;
     let skipped = 0;
     for (const saved of backup.items) {
@@ -125,9 +109,9 @@ export async function restoreTaggerBackup(
     return { restored, skipped };
 }
 
-function readBackup(backupPath: string): TaggerBackup {
-    const { fs } = getNodeModules();
-    const parsed = JSON.parse(fs.readFileSync(backupPath, "utf8"));
+async function readBackup(backupPath: string): Promise<TaggerBackup> {
+    const result = await getBackendClient().readBackup(backupPath);
+    const parsed = JSON.parse(result.content);
     if (
         !parsed ||
         parsed.version !== 1 ||
