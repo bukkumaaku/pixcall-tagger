@@ -1,7 +1,16 @@
-declare const require: (moduleName: string) => any;
+type NodeRequire = (moduleName: string) => any;
 
-const fs = require("node:fs");
-const path = require("node:path");
+const nodeRequire = (globalThis as typeof globalThis & { require?: NodeRequire }).require;
+
+function getNodeModules() {
+    if (!nodeRequire) {
+        throw new Error("当前 Pixcall 插件环境不支持本地备份文件操作");
+    }
+    return {
+        fs: nodeRequire("node:fs"),
+        path: nodeRequire("node:path"),
+    };
+}
 
 export type TaggerBackupItem = {
     id: string;
@@ -24,8 +33,10 @@ export type TaggerBackupOption = {
     itemCount: number;
 };
 
-const backupDirectory = (modelFilePath: string) =>
-    path.join(path.dirname(modelFilePath), "backup");
+const backupDirectory = (modelFilePath: string) => {
+    const { path } = getNodeModules();
+    return path.join(path.dirname(modelFilePath), "backup");
+};
 
 const safeOperationName = (operation: TaggerBackup["operation"]) =>
     operation.replace(/[^a-z0-9-]/gi, "-");
@@ -36,6 +47,7 @@ export function createTaggerBackup(
     items: any[],
 ): string {
     if (!modelFilePath.trim()) throw new Error("模型路径为空，无法创建备份");
+    const { fs, path } = getNodeModules();
     const directory = backupDirectory(modelFilePath);
     fs.mkdirSync(directory, { recursive: true });
     const createdAt = new Date().toISOString();
@@ -62,6 +74,7 @@ export function createTaggerBackup(
 
 export function listTaggerBackups(modelFilePath: string): TaggerBackupOption[] {
     if (!modelFilePath.trim()) return [];
+    const { fs, path } = getNodeModules();
     const directory = backupDirectory(modelFilePath);
     if (!fs.existsSync(directory)) return [];
     return fs
@@ -113,6 +126,7 @@ export async function restoreTaggerBackup(
 }
 
 function readBackup(backupPath: string): TaggerBackup {
+    const { fs } = getNodeModules();
     const parsed = JSON.parse(fs.readFileSync(backupPath, "utf8"));
     if (
         !parsed ||
