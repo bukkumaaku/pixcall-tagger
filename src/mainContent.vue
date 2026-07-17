@@ -2,6 +2,7 @@
     import wdTypeTagger from "./components/wdTypeTagger.vue";
     import llmTypeTagger from "./components/llmTypeTagger.vue";
     import semanticSearch from "./components/semanticSearch.vue";
+    import oneClickWorkflow from "./components/oneClickWorkflow.vue";
     import settingsPanel from "./components/settingsPanel.vue";
     import taskCenter from "./components/taskCenter.vue";
     import {
@@ -17,6 +18,7 @@
         SettingsOutline,
         SparklesOutline,
         ImagesOutline,
+        FlashOutline,
     } from "@vicons/ionicons5";
     import { h, onMounted, ref, type Component } from "vue";
     import { backenAPI, t, dialog, config, notification } from "./api/backen";
@@ -96,6 +98,11 @@
             icon: renderIcon(ImagesOutline),
         },
         {
+            label: t.value("nav.one_click_workflow"),
+            key: "one-click-workflow",
+            icon: renderIcon(FlashOutline),
+        },
+        {
             label: t.value("nav.settings"),
             key: "settings",
             icon: renderIcon(SettingsOutline),
@@ -170,6 +177,7 @@
                 <wdTypeTagger v-if="currentPage == 'wdtype'" />
                 <llmTypeTagger v-if="currentPage == 'llmtype'" />
                 <semanticSearch v-if="currentPage == 'semantic-search'" />
+                <oneClickWorkflow v-if="currentPage == 'one-click-workflow'" />
                 <settingsPanel v-if="currentPage == 'settings'" />
             </n-layout>
         </n-layout>

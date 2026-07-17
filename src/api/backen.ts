@@ -83,6 +83,7 @@ export const backenAPI = {
         }));
     },
     async startGetTag(items: any) {
+        error_image = [];
         await this.getConfig();
         return this.startWdTagger(items);
     },

@@ -37,6 +37,7 @@
         "wd": "WD Model Tagging",
         "llm": "LLM Image Understanding",
         "semantic_search": "Semantic Search",
+        "one_click_workflow": "One-click Workflow",
         "settings": "Settings"
     },
     "window": {

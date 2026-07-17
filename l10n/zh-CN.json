@@ -37,6 +37,7 @@
         "wd": "WD 模型打标签",
         "llm": "LLM 图像理解",
         "semantic_search": "语义搜索",
+        "one_click_workflow": "一键处理",
         "settings": "设置"
     },
     "window": {
