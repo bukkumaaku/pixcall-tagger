@@ -249,14 +249,12 @@ export class BackendClient {
         text: string,
         topK: number,
         includeTags = false,
-        includeContext = true,
     ): Promise<EmbeddingSearchResult> {
         return this.request("embedding_search_text", {
             sessionId,
             text,
             topK,
             includeTags,
-            includeContext,
         });
     }
 
@@ -266,7 +264,6 @@ export class BackendClient {
         excludeItemId: string,
         imageModifiedAt: number,
         topK: number,
-        includeContext = true,
     ): Promise<EmbeddingSearchResult> {
         return this.request("embedding_search_image", {
             sessionId,
@@ -274,7 +271,6 @@ export class BackendClient {
             excludeItemId,
             imageModifiedAt,
             topK,
-            includeContext,
         });
     }
 

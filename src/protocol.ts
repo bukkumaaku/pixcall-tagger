@@ -161,7 +161,6 @@ export type EmbeddingSearchTextRequest = {
     text: string;
     topK: number;
     includeTags?: boolean;
-    includeContext?: boolean;
 };
 
 export type EmbeddingSearchImageRequest = {
@@ -170,7 +169,6 @@ export type EmbeddingSearchImageRequest = {
     excludeItemId: string;
     imageModifiedAt: number;
     topK: number;
-    includeContext?: boolean;
 };
 
 export type EmbeddingUnloadRequest = {
