@@ -1,4 +1,3 @@
-pub mod aaa;
 pub mod backup;
 pub mod check_update;
 pub mod config;
@@ -82,7 +81,6 @@ impl CommandHandler for BuiltinHandlers {
         events: &mut dyn EventEmitter,
     ) -> HandlerResult<ResultPayload> {
         match command {
-            Command::Aaa(request) => aaa::handle(request).map(ResultPayload::Aaa),
             Command::CheckForUpdate(request) => {
                 check_update::handle(request).map(ResultPayload::CheckForUpdate)
             }

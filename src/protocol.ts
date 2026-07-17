@@ -4,10 +4,6 @@ export type EchoRequest = {
     message: string;
 };
 
-export type AaaRequest = {
-    value: string;
-};
-
 export type CheckForUpdateRequest = Record<string, never>;
 
 export type SystemToolsRequest = Record<string, never>;
@@ -263,7 +259,6 @@ export type RemoteVisionProcessImageRequest = { provider: RemoteVisionProvider; 
 
 export type CommandPayloadMap = {
     echo: EchoRequest;
-    aaa: AaaRequest;
     check_for_update: CheckForUpdateRequest;
     system_tools: SystemToolsRequest;
     minimize_plugin_window: MinimizePluginWindowRequest;
@@ -313,10 +308,6 @@ export type WorkerRequest<K extends CommandType = CommandType> = {
 
 export type EchoResult = {
     message: string;
-};
-
-export type AaaResult = {
-    value: string;
 };
 
 export type CheckForUpdateResult = {
@@ -568,7 +559,6 @@ export type RemoteVisionProcessImageResult = { provider: RemoteVisionProvider; m
 
 export type ResultDataMap = {
     echo: EchoResult;
-    aaa: AaaResult;
     check_for_update: CheckForUpdateResult;
     system_tools: SystemToolsResult;
     minimize_plugin_window: MinimizePluginWindowResult;

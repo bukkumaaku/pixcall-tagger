@@ -4,10 +4,12 @@ import { translate } from "./i18n";
 
 // Use a revisioned endpoint so an older worker cannot be mistaken for the
 // current protocol implementation after the plugin is upgraded.
-const WORKER_PORT = 22512;
-const WORKER_TOKEN = "pixcall-ai-tagger-v2";
-const LEGACY_WORKER_PORT = 22511;
-const LEGACY_WORKER_TOKEN = "pixcall-ai-tagger-v1";
+const WORKER_PORT = 22513;
+const WORKER_TOKEN = "pixcall-ai-tagger-v3";
+const LEGACY_WORKERS = [
+    { port: 22512, token: "pixcall-ai-tagger-v2" },
+    { port: 22511, token: "pixcall-ai-tagger-v1" },
+];
 let pixcallBaseUrl = "";
 let workerReady: Promise<void> | null = null;
 
@@ -64,7 +66,7 @@ export async function ensureWorker() {
 }
 
 async function startWorker() {
-    await shutdownLegacyWorker();
+    await shutdownLegacyWorkers();
     if (await workerHealth()) return;
     await shutdownIncompatibleWorker();
     const platform = window.pixcall?.platform;
@@ -90,16 +92,18 @@ async function startWorker() {
     throw new Error(`ai-worker 未能在 127.0.0.1:${WORKER_PORT} 启动`);
 }
 
-async function shutdownLegacyWorker() {
-    try {
-        const response = await fetch(`http://127.0.0.1:${LEGACY_WORKER_PORT}/health`);
-        if (!response.ok) return;
-        await fetch(`http://127.0.0.1:${LEGACY_WORKER_PORT}/shutdown`, {
-            method: "POST",
-            headers: { "X-Pixcall-AI-Token": LEGACY_WORKER_TOKEN },
-        });
-    } catch {
-        // No legacy worker is listening on the previous endpoint.
+async function shutdownLegacyWorkers() {
+    for (const worker of LEGACY_WORKERS) {
+        try {
+            const response = await fetch(`http://127.0.0.1:${worker.port}/health`);
+            if (!response.ok) continue;
+            await fetch(`http://127.0.0.1:${worker.port}/shutdown`, {
+                method: "POST",
+                headers: { "X-Pixcall-AI-Token": worker.token },
+            });
+        } catch {
+            // No worker is listening on this legacy endpoint.
+        }
     }
 }
 

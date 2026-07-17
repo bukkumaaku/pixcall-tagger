@@ -1,5 +1,4 @@
 import {
-    type AaaResult,
     type CheckForUpdateResult,
     type CommandPayloadMap,
     type CommandType,
@@ -74,7 +73,7 @@ export class BackendClient {
     private running = false;
 
     get path() {
-        return "http://127.0.0.1:22512";
+        return "http://127.0.0.1:22513";
     }
 
     get isRunning() {
@@ -96,10 +95,6 @@ export class BackendClient {
 
     echo(message: string): Promise<EchoResult> {
         return this.request("echo", { message });
-    }
-
-    aaa(value: string): Promise<AaaResult> {
-        return this.request("aaa", { value });
     }
 
     checkForUpdate(): Promise<CheckForUpdateResult> {

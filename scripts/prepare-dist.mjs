@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, rm } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +13,18 @@ await rm(path.join(dist, "icons"), { recursive: true, force: true });
 await cp(path.join(projectRoot, "icons"), path.join(dist, "icons"), { recursive: true });
 await rm(path.join(dist, "l10n"), { recursive: true, force: true });
 await cp(path.join(projectRoot, "l10n"), path.join(dist, "l10n"), { recursive: true });
+
+const indexHtml = await readFile(path.join(dist, "index.html"), "utf8");
+const activeAssets = new Set(
+    [...indexHtml.matchAll(/\.\/assets\/([^"']+)/g)].map((match) => match[1]),
+);
+const assetsDirectory = path.join(dist, "assets");
+for (const entry of await readdir(assetsDirectory, { withFileTypes: true })) {
+    if (entry.isFile() && !activeAssets.has(entry.name)) {
+        await rm(path.join(assetsDirectory, entry.name), { force: true });
+    }
+}
+
 try {
     await rm(path.join(dist, "bin"), { recursive: true, force: true });
     await cp(path.join(projectRoot, "bin"), path.join(dist, "bin"), { recursive: true });
