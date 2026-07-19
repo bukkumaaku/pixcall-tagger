@@ -109,6 +109,7 @@ export type EmbeddingLoadRequest = {
     apiKey: string;
     remoteModel: string;
     remoteDimension: number;
+    legacyModelKey: string;
 };
 
 export type EmbeddingImageInput = {
@@ -159,6 +160,7 @@ export type EmbeddingStatusRequest = {
     namespace?: string;
     modelKey?: string;
     dimension?: number;
+    legacyModelKey?: string;
 };
 
 export type EmbeddingSearchTextRequest = {

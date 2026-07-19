@@ -173,6 +173,7 @@ export class BackendClient {
         apiKey = "",
         remoteModel = "",
         remoteDimension = 0,
+        legacyModelKey = "",
     ): Promise<EmbeddingLoadResult> {
         return this.request("embedding_load", {
             sessionId,
@@ -187,6 +188,7 @@ export class BackendClient {
             apiKey,
             remoteModel,
             remoteDimension,
+            legacyModelKey,
         });
     }
 
@@ -236,6 +238,7 @@ export class BackendClient {
             namespace?: string;
             modelKey?: string;
             dimension?: number;
+            legacyModelKey?: string;
         } = {},
     ): Promise<EmbeddingStatusResult> {
         return this.request("embedding_status", { sessionId, ...options });

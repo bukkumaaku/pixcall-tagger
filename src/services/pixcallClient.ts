@@ -107,6 +107,11 @@ class PixcallClient {
         return this.hydrateEntries(entries);
     }
 
+    async getAllItemIds() {
+        await this.getSettings();
+        return [...new Set(await this.getDatabaseEntryIds() ?? await this.getSearchEntryIds())];
+    }
+
     private async getDatabaseEntryIds(): Promise<string[] | null> {
         const libraryPath = this.settings?.library?.path || this.settings?.library_path;
         if (!libraryPath) return null;
@@ -275,6 +280,7 @@ export function installPixcallHost() {
             getSelected: () => pixcallClient.getSelectedItems(),
             getAll: () => pixcallClient.getAllItems(),
             get: () => pixcallClient.getAllItems(),
+            getAllIds: () => pixcallClient.getAllItemIds(),
             getById: (id: string) => pixcallClient.getItem(id),
             getByIds: (ids: string[]) => pixcallClient.getItems(ids),
             open: (id: string) => pixcallClient.openItem(id),

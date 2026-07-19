@@ -6,6 +6,7 @@ declare global {
         item: {
             getSelected(): Promise<PixcallItem[]>;
             getAll(): Promise<PixcallItem[]>;
+            getAllIds(): Promise<string[]>;
             get(options?: unknown): Promise<PixcallItem[]>;
             getById(id: string): Promise<PixcallItem>;
             getByIds(ids: string[]): Promise<PixcallItem[]>;
