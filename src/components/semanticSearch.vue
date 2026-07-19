@@ -188,6 +188,15 @@
     });
     const remoteModelKey = (
         provider: "open_ai" | "gemini",
+        model: string,
+        dimension: number,
+    ) => {
+        const identity = [provider, model.trim(), dimension].join("\u0000");
+        const digest = stableHash(identity);
+        return `${provider}:${model}:${dimension || "auto"}:${digest}`;
+    };
+    const endpointRemoteModelKey = (
+        provider: "open_ai" | "gemini",
         endpoint: string,
         model: string,
         dimension: number,
@@ -198,15 +207,6 @@
             model.trim(),
             dimension,
         ].join("\u0000");
-        const digest = stableHash(identity);
-        return `${provider}:${model}:${dimension || "auto"}:${digest}`;
-    };
-    const legacyRemoteModelKey = (
-        provider: "open_ai" | "gemini",
-        model: string,
-        dimension: number,
-    ) => {
-        const identity = [provider, model.trim(), dimension].join("\u0000");
         const digest = stableHash(identity);
         return `${provider}:${model}:${dimension || "auto"}:${digest}`;
     };
@@ -370,7 +370,7 @@
                     apiKey: "",
                     legacyModelKey: "",
                 })),
-                ...profiles.filter((profile) => profile.model && profile.endpoint).map((profile) => ({ name: `${profile.name || profile.model} · ${profile.model}`, modelKey: remoteModelKey(profile.provider, profile.endpoint, profile.model, profile.provider === "gemini" ? profile.dimension : 0), modelPath: "", tokenizerPath: "", dimension: profile.provider === "gemini" ? profile.dimension : 0, provider: profile.provider, remoteModel: profile.model, selectionKey: `remote:${profile.id}`, endpoint: profile.endpoint, apiKey: profile.apiKey, legacyModelKey: legacyRemoteModelKey(profile.provider, profile.model, profile.provider === "gemini" ? profile.dimension : 0) })),
+                ...profiles.filter((profile) => profile.model && profile.endpoint).map((profile) => ({ name: `${profile.name || profile.model} · ${profile.model}`, modelKey: remoteModelKey(profile.provider, profile.model, profile.provider === "gemini" ? profile.dimension : 0), modelPath: "", tokenizerPath: "", dimension: profile.provider === "gemini" ? profile.dimension : 0, provider: profile.provider, remoteModel: profile.model, selectionKey: `remote:${profile.id}`, endpoint: profile.endpoint, apiKey: profile.apiKey, legacyModelKey: endpointRemoteModelKey(profile.provider, profile.endpoint, profile.model, profile.provider === "gemini" ? profile.dimension : 0) })),
             ];
             if (
                 !models.value.some(
