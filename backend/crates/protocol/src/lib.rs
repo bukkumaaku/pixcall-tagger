@@ -164,6 +164,8 @@ pub struct EmbeddingAnnotationInput {
 pub struct EmbeddingIndexBatchRequest {
     pub session_id: String,
     pub images: Vec<EmbeddingImageInput>,
+    #[serde(default)]
+    pub force: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -173,6 +175,10 @@ pub struct EmbeddingIndexTagsRequest {
     pub items: Vec<EmbeddingTagInput>,
     #[serde(default)]
     pub concurrency: usize,
+    #[serde(default)]
+    pub force: bool,
+    #[serde(default)]
+    pub force_tag_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -182,6 +188,8 @@ pub struct EmbeddingIndexAnnotationsRequest {
     pub items: Vec<EmbeddingAnnotationInput>,
     #[serde(default)]
     pub concurrency: usize,
+    #[serde(default)]
+    pub force: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
