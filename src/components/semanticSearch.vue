@@ -574,9 +574,16 @@
         return items.filter(
             (item) =>
                 !item.isDeleted &&
-                IMAGE_EXTENSIONS.has(String(item.ext || "").toLowerCase()) &&
+                IMAGE_EXTENSIONS.has(itemExtension(item)) &&
                 Boolean(item.filePath || item.thumbnailPath),
         );
+    }
+
+    function itemExtension(item: PixcallImage) {
+        const explicit = String(item.ext || "").trim().toLowerCase().replace(/^\./, "");
+        if (explicit) return explicit;
+        const source = item.filePath || item.thumbnailPath || item.name || "";
+        return source.split(/[\\/]/).pop()?.match(/\.([^.]+)$/)?.[1].toLowerCase() || "";
     }
 
     async function getLibraryItemIds(): Promise<string[]> {

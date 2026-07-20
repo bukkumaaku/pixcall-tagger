@@ -94,7 +94,7 @@ class PixcallClient {
 
     async getAllItems() {
         await this.getSettings();
-        const ids = await this.getDatabaseEntryIds() ?? await this.getSearchEntryIds();
+        const ids = await this.getAllEntryIds();
         if (ids.length === 0) return [];
         const entries: PixcallEntry[] = [];
         for (let offset = 0; offset < ids.length; offset += 500) {
@@ -109,7 +109,16 @@ class PixcallClient {
 
     async getAllItemIds() {
         await this.getSettings();
-        return [...new Set(await this.getDatabaseEntryIds() ?? await this.getSearchEntryIds())];
+        return this.getAllEntryIds();
+    }
+
+    private async getAllEntryIds() {
+        const databaseIds = await this.getDatabaseEntryIds();
+        if (databaseIds?.length) return databaseIds;
+
+        // An empty database result is not authoritative: older Pixcall
+        // schemas can be readable while the file-entry query matches nothing.
+        return [...new Set(await this.getSearchEntryIds())];
     }
 
     private async getDatabaseEntryIds(): Promise<string[] | null> {
