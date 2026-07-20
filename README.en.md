@@ -4,9 +4,17 @@ English | [简体中文](./README.md)
 
 Pixcall AI Tagger is a built-in Pixcall plugin with a Vue frontend and a Rust `ai-worker`. It generates tags and descriptions for images and videos and provides semantic search over a Pixcall library.
 
-Current version: `2.0.2`
+Current version: `2.1.0`
 
 ## Changelog
+
+### `2.1.0`
+
+- Split image, tag, and annotation vectors into independent indexes with weighted combined semantic search.
+- Added multiple remote embedding and LLM profiles with OpenAI-compatible and native Gemini REST APIs.
+- Added a one-click workflow for tagging, annotation generation, and all three vectorization stages.
+- Added negative search, index rebuild and recovery, remote LLM concurrency and cache management, and categorized backups.
+- Fixed full-library enumeration, stale worker protocols, concurrent config writes, and lost partial batch results.
 
 ### `2.0.2`
 
@@ -75,7 +83,7 @@ WD and local embedding inference use DirectML first on Windows and CoreML first 
 Pixcall `0.9.5` or newer is required.
 
 1. Open [GitHub Releases](https://github.com/bukkumaaku/pixcall-tagger/releases/latest).
-2. Download the prebuilt `pixcall-plugin-v2.0.2.zip` package.
+2. Download the prebuilt `pixcall-plugin-v2.1.0.zip` package.
 3. Extract the archive.
 4. Open Pixcall's plugin manager and choose **Load Plugin Folder**.
 5. Select the extracted `release-dist` directory, which directly contains `manifest.json`.
@@ -177,7 +185,7 @@ Rust tests:
 cargo test --manifest-path backend/Cargo.toml --workspace
 ```
 
-GitHub Actions builds Windows x64 and macOS ARM64 when `main` is pushed. Pushing a `v*` tag builds the cross-platform plugin and publishes its zip package to GitHub Releases. The current tag example is `v2.0.2`.
+GitHub Actions builds Windows x64 and macOS ARM64 when `main` is pushed. Pushing a `v*` tag builds the cross-platform plugin and publishes its zip package to GitHub Releases. The current tag example is `v2.1.0`.
 
 ## Project structure
 
