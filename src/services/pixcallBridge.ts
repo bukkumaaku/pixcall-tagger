@@ -4,14 +4,16 @@ import { translate } from "./i18n";
 
 // Use a revisioned endpoint so an older worker cannot be mistaken for the
 // current protocol implementation after the plugin is upgraded.
-const WORKER_PORT = 22513;
-const WORKER_TOKEN = "pixcall-ai-tagger-v3";
+const WORKER_PORT = 22514;
+const WORKER_TOKEN = "pixcall-ai-tagger-v4";
 const LEGACY_WORKERS = [
+    { port: 22513, token: "pixcall-ai-tagger-v3" },
     { port: 22512, token: "pixcall-ai-tagger-v2" },
     { port: 22511, token: "pixcall-ai-tagger-v1" },
 ];
 let pixcallBaseUrl = "";
 let workerReady: Promise<void> | null = null;
+let shutdownRequested = false;
 
 export type PixcallContext = "settings" | "serverPort" | "initMessage";
 
@@ -66,6 +68,7 @@ export async function ensureWorker() {
 }
 
 async function startWorker() {
+    shutdownRequested = false;
     await shutdownLegacyWorkers();
     if (await workerHealth()) return;
     await shutdownIncompatibleWorker();
@@ -82,7 +85,15 @@ async function startWorker() {
     await pixcallRequest({
         type: "spawn_child_process",
         command,
-        args: ["--detach-http", "--port", String(WORKER_PORT), "--token", WORKER_TOKEN],
+        args: [
+            "--detach-http",
+            "--port",
+            String(WORKER_PORT),
+            "--token",
+            WORKER_TOKEN,
+            "--host-port",
+            String((await getPixcallContext<number>("serverPort")) || 22510),
+        ],
         cwd: dirname(command),
     });
     for (let attempt = 0; attempt < 80; attempt++) {
@@ -180,10 +191,12 @@ export async function workerRequest<K extends CommandType>(
 }
 
 export async function shutdownWorker() {
-    if (!(await workerHealth())) return;
+    if (shutdownRequested) return;
+    shutdownRequested = true;
+    workerReady = null;
     await fetch(`http://127.0.0.1:${WORKER_PORT}/shutdown`, {
         method: "POST",
         headers: { "X-Pixcall-AI-Token": WORKER_TOKEN },
+        keepalive: true,
     }).catch(() => undefined);
-    workerReady = null;
 }

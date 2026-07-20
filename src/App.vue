@@ -9,13 +9,18 @@
     } from "naive-ui";
     import { CloseOutline, RemoveOutline } from "@vicons/ionicons5";
     import MainContent from "./mainContent.vue";
-    import { closePixcallWindow } from "./services/pixcallBridge";
+    import { closePixcallWindow, shutdownWorker } from "./services/pixcallBridge";
     import { getBackendClient } from "./services/backendClient";
     import { t } from "./api/backen";
 
     const minimizeWindow = async () => {
         const result = await getBackendClient().minimizePluginWindow();
         if (!result.minimized) console.warn("Pixcall plugin window was not found");
+    };
+
+    const closeWindow = async () => {
+        void shutdownWorker();
+        await closePixcallWindow();
     };
 </script>
 
@@ -30,7 +35,7 @@
                         <button type="button" class="titlebar__button" :title="t('window.minimize')" @click="minimizeWindow">
                             <n-icon :size="18"><RemoveOutline /></n-icon>
                         </button>
-                        <button type="button" class="titlebar__button titlebar__close" :title="t('window.close')" @click="closePixcallWindow">
+                        <button type="button" class="titlebar__button titlebar__close" :title="t('window.close')" @click="closeWindow">
                             <n-icon :size="18"><CloseOutline /></n-icon>
                         </button>
                     </div>

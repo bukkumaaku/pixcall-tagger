@@ -1,6 +1,8 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
+    thread,
+    time::{Duration, Instant},
 };
 
 use protocol::{Request, Response, error_codes};
@@ -68,16 +70,68 @@ struct HttpRequest {
 pub fn run<H: CommandHandler>(
     port: u16,
     token: String,
+    host_port: Option<u16>,
     handlers: &mut H,
 ) -> Result<(), HttpServerError> {
     let listener = TcpListener::bind(("127.0.0.1", port))?;
+    listener.set_nonblocking(host_port.is_some())?;
+    let mut host_watchdog = host_port.map(HostWatchdog::new);
     let mut shutdown = false;
     while !shutdown {
-        let (stream, _) = listener.accept()?;
-        shutdown = handle_connection(stream, &token, handlers)?;
+        if host_watchdog
+            .as_mut()
+            .is_some_and(HostWatchdog::host_is_gone)
+        {
+            break;
+        }
+        match listener.accept() {
+            Ok((stream, _)) => {
+                shutdown = handle_connection(stream, &token, handlers)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => return Err(error.into()),
+        }
     }
     handlers.shutdown()?;
     Ok(())
+}
+
+// The detached worker cannot rely on OS child-process cleanup, so it watches
+// Pixcall's local API listener and shuts down after a short failure window.
+struct HostWatchdog {
+    port: u16,
+    last_check: Instant,
+    consecutive_failures: u8,
+}
+
+impl HostWatchdog {
+    const CHECK_INTERVAL: Duration = Duration::from_secs(2);
+    const CONNECT_TIMEOUT: Duration = Duration::from_millis(500);
+    const FAILURE_LIMIT: u8 = 3;
+
+    fn new(port: u16) -> Self {
+        Self {
+            port,
+            last_check: Instant::now() - Self::CHECK_INTERVAL,
+            consecutive_failures: 0,
+        }
+    }
+
+    fn host_is_gone(&mut self) -> bool {
+        if self.last_check.elapsed() < Self::CHECK_INTERVAL {
+            return false;
+        }
+        self.last_check = Instant::now();
+        let address = SocketAddr::from((Ipv4Addr::LOCALHOST, self.port));
+        if TcpStream::connect_timeout(&address, Self::CONNECT_TIMEOUT).is_ok() {
+            self.consecutive_failures = 0;
+        } else {
+            self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+        }
+        self.consecutive_failures >= Self::FAILURE_LIMIT
+    }
 }
 
 fn handle_connection<H: CommandHandler>(

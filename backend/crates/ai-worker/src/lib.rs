@@ -38,13 +38,17 @@ pub fn run_stdio() -> Result<(), WorkerError> {
     Ok(())
 }
 
-pub fn run_http(port: u16, token: String) -> Result<(), WorkerError> {
+pub fn run_http(port: u16, token: String, host_port: Option<u16>) -> Result<(), WorkerError> {
     let mut handlers = BuiltinHandlers::default();
-    http::run(port, token, &mut handlers)?;
+    http::run(port, token, host_port, &mut handlers)?;
     Ok(())
 }
 
-pub fn spawn_detached_http(port: u16, token: String) -> Result<(), WorkerError> {
+pub fn spawn_detached_http(
+    port: u16,
+    token: String,
+    host_port: Option<u16>,
+) -> Result<(), WorkerError> {
     let executable = std::env::current_exe()?;
     let mut command = Command::new(executable);
     command
@@ -56,6 +60,9 @@ pub fn spawn_detached_http(port: u16, token: String) -> Result<(), WorkerError> 
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    if let Some(host_port) = host_port {
+        command.arg("--host-port").arg(host_port.to_string());
+    }
 
     #[cfg(windows)]
     {

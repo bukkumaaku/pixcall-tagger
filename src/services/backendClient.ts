@@ -49,7 +49,7 @@ import {
     type EmbeddingUnloadResult,
     createRequest,
 } from "../protocol";
-import { ensureWorker, workerRequest } from "./pixcallBridge";
+import { ensureWorker, shutdownWorker, workerRequest } from "./pixcallBridge";
 
 export class BackendClientError extends Error {
     readonly code: string;
@@ -73,7 +73,7 @@ export class BackendClient {
     private running = false;
 
     get path() {
-        return "http://127.0.0.1:22513";
+        return "http://127.0.0.1:22514";
     }
 
     get isRunning() {
@@ -371,6 +371,7 @@ export class BackendClient {
 
     dispose() {
         this.running = false;
+        void shutdownWorker();
     }
 
     private async request<K extends CommandType>(

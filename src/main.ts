@@ -12,7 +12,9 @@ async function bootstrap() {
     await initializeRuntimePaths();
     const backend = getBackendClient();
     backend.start();
-    window.addEventListener("beforeunload", () => backend.dispose(), { once: true });
+    const disposeWorker = () => backend.dispose();
+    window.addEventListener("beforeunload", disposeWorker, { once: true });
+    window.addEventListener("pagehide", disposeWorker, { once: true });
     createApp(App).mount("#app");
 }
 
