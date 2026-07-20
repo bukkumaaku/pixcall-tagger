@@ -911,7 +911,7 @@ pub struct RemoteVisionProcessImageResult {
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteVisionBatchItemResult {
     pub item_id: String,
@@ -990,6 +990,7 @@ pub enum ResultPayload {
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
 pub enum ProgressPayload {
     DownloadFile(DownloadFileProgress),
+    RemoteVisionBatchItem(RemoteVisionBatchItemResult),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
