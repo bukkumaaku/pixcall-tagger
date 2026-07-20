@@ -262,6 +262,8 @@ export type LlamafileUnloadRequest = {
 };
 export type RemoteVisionProvider = "open_ai" | "gemini";
 export type RemoteVisionProcessImageRequest = { provider: RemoteVisionProvider; endpoint: string; apiKey?: string; model: string; imagePath: string; instruction: string; temperature?: number; maxTokens?: number };
+export type RemoteVisionBatchImage = { itemId: string; imagePath: string };
+export type RemoteVisionProcessBatchRequest = { provider: RemoteVisionProvider; endpoint: string; apiKey?: string; model: string; images: RemoteVisionBatchImage[]; instruction: string; temperature?: number; maxTokens?: number; concurrency: number };
 
 export type CommandPayloadMap = {
     echo: EchoRequest;
@@ -299,6 +301,7 @@ export type CommandPayloadMap = {
     llamafile_process_image: LlamafileProcessImageRequest;
     llamafile_unload: LlamafileUnloadRequest;
     remote_vision_process_image: RemoteVisionProcessImageRequest;
+    remote_vision_process_batch: RemoteVisionProcessBatchRequest;
 };
 
 export type CommandType = keyof CommandPayloadMap;
@@ -562,6 +565,8 @@ export type LlamafileUnloadResult = {
     removed: boolean;
 };
 export type RemoteVisionProcessImageResult = { provider: RemoteVisionProvider; model: string; imagePath: string; content: string };
+export type RemoteVisionBatchItemResult = { itemId: string; imagePath: string; content: string; error: string };
+export type RemoteVisionProcessBatchResult = { provider: RemoteVisionProvider; model: string; results: RemoteVisionBatchItemResult[] };
 
 export type ResultDataMap = {
     echo: EchoResult;
@@ -599,6 +604,7 @@ export type ResultDataMap = {
     llamafile_process_image: LlamafileProcessImageResult;
     llamafile_unload: LlamafileUnloadResult;
     remote_vision_process_image: RemoteVisionProcessImageResult;
+    remote_vision_process_batch: RemoteVisionProcessBatchResult;
 };
 
 export type ResultKind = keyof ResultDataMap;
