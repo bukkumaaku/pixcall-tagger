@@ -133,6 +133,7 @@
     const totalImages = ref(0);
     const libraryTagCount = ref(0);
     const libraryCountsReady = ref(false);
+    const libraryReadError = ref("");
     const processedImages = ref(0);
     const indexedThisRun = ref(0);
     const skippedThisRun = ref(0);
@@ -278,8 +279,8 @@
             await refreshIndexStatus();
             try {
                 await refreshLibraryCounts();
-            } catch {
-                libraryCountsReady.value = false;
+            } catch (error) {
+                notification(errorMessage(error), "error");
             }
             await persistSettings();
             isReady.value = true;
@@ -392,8 +393,8 @@
             "embedding",
             INDEX_FILENAME,
         );
-        const namespace = String(eagle.library.path || eagle.library.name || "default");
         try {
+            const namespace = await resolveLibraryNamespace();
             const status = await getBackendClient().embeddingStatus(SESSION_ID, {
                 databasePath,
                 namespace,
@@ -407,8 +408,9 @@
             tagLinkCount.value = status.tagLinkCount;
             annotationDocumentCount.value = status.annotationDocumentCount;
             annotationIndexedCount.value = status.annotationIndexedCount;
-        } catch {
-            indexStatus.value = "索引状态读取失败";
+        } catch (error) {
+            indexStatus.value = `索引状态读取失败：${errorMessage(error)}`;
+            console.error("读取语义索引状态失败", error);
         }
     }
 
@@ -425,7 +427,7 @@
             "embedding",
             INDEX_FILENAME,
         );
-        const namespace = String(eagle.library.path || eagle.library.name || "default");
+        const namespace = await resolveLibraryNamespace();
         const signature = [
             model.modelKey,
             model.modelPath,
@@ -476,33 +478,99 @@
         }
     }
 
-    async function getLibraryImages(): Promise<PixcallImage[]> {
-        let items: PixcallImage[];
-        try {
-            items = await eagle.item.get({
-                fields: [
-                    "id",
-                    "name",
-                    "ext",
-                    "filePath",
-                    "thumbnailPath",
-                    "modifiedAt",
-                    "width",
-                    "height",
-                    "isDeleted",
-                    "tags",
-                    "annotation",
-                ],
-            });
-        } catch {
-            items = await eagle.item.getAll();
+    async function resolveLibraryNamespace(): Promise<string> {
+        let info: Record<string, unknown> | undefined;
+        let infoError: unknown;
+        if (typeof eagle.library?.info === "function") {
+            try {
+                const result = await eagle.library.info();
+                if (result && typeof result === "object") {
+                    info = result as Record<string, unknown>;
+                }
+            } catch (error) {
+                infoError = error;
+                console.warn("eagle.library.info() 调用失败，尝试旧版属性", error);
+            }
         }
+
+        const candidates = [
+            info?.path,
+            info?.libraryPath,
+            eagle.library?.path,
+            info?.name,
+            eagle.library?.name,
+        ];
+        for (const candidate of candidates) {
+            if (typeof candidate === "string" && candidate.trim()) {
+                return candidate.trim();
+            }
+        }
+
+        const detail = infoError ? `：${errorMessage(infoError)}` : "";
+        throw new Error(`无法读取 Pixcall 当前图库标识${detail}`);
+    }
+
+    function normalizeLibraryItems(result: unknown, apiName: string): PixcallImage[] {
+        if (Array.isArray(result)) return result as PixcallImage[];
         if (
-            items.length > 0 &&
-            items.every((item) => !item.filePath && !item.thumbnailPath)
+            result &&
+            typeof result === "object" &&
+            Array.isArray((result as { items?: unknown }).items)
         ) {
-            items = await eagle.item.getAll();
+            return (result as { items: PixcallImage[] }).items;
         }
+        throw new Error(`${apiName} 未返回条目数组`);
+    }
+
+    async function listLibraryItems(): Promise<PixcallImage[]> {
+        const attempts: Array<{
+            name: string;
+            run: () => Promise<unknown>;
+        }> = [];
+        if (typeof eagle.item?.list === "function") {
+            attempts.push({
+                name: "eagle.item.list",
+                run: () => eagle.item.list({ limit: 999999 }),
+            });
+        }
+        if (typeof eagle.item?.getAll === "function") {
+            attempts.push({
+                name: "eagle.item.getAll",
+                run: () => eagle.item.getAll(),
+            });
+        }
+        if (typeof eagle.item?.get === "function") {
+            attempts.push({
+                name: "eagle.item.get",
+                run: () => eagle.item.get(),
+            });
+        }
+
+        let emptyResult: PixcallImage[] | undefined;
+        const failures: string[] = [];
+        for (const attempt of attempts) {
+            try {
+                const items = normalizeLibraryItems(await attempt.run(), attempt.name);
+                if (items.length === 0) {
+                    emptyResult = items;
+                    continue;
+                }
+                if (items.some((item) => Boolean(item.filePath || item.thumbnailPath))) {
+                    return items;
+                }
+                failures.push(`${attempt.name} 返回字段不完整`);
+            } catch (error) {
+                failures.push(`${attempt.name}: ${errorMessage(error)}`);
+            }
+        }
+
+        if (emptyResult) return emptyResult;
+        const detail = failures.length ? `：${failures.join("；")}` : "";
+        throw new Error(`无法读取 Pixcall 图库条目${detail}`);
+    }
+
+    async function getLibraryImages(): Promise<PixcallImage[]> {
+        const items = await listLibraryItems();
         return items.filter(
             (item) =>
                 !item.isDeleted &&
@@ -535,7 +603,15 @@
     }
 
     async function refreshLibraryCounts() {
-        applyLibraryCounts(await getLibraryImages());
+        try {
+            applyLibraryCounts(await getLibraryImages());
+            libraryReadError.value = "";
+        } catch (error) {
+            libraryCountsReady.value = false;
+            libraryReadError.value = errorMessage(error);
+            console.error("读取 Pixcall 图库统计失败", error);
+            throw error;
+        }
     }
 
     function toEmbeddingInput(item: PixcallImage): EmbeddingImageInput {
@@ -1154,6 +1230,15 @@
                 已索引 {{ tagIndexedCount }} 个标签
             </n-tag>
         </header>
+
+        <n-alert
+            v-if="libraryReadError"
+            title="图库读取失败"
+            type="error"
+            class="failure-alert"
+        >
+            {{ libraryReadError }}
+        </n-alert>
 
         <n-tabs v-model:value="activeTab" type="line" animated class="feature-tabs">
             <n-tab-pane name="index" tab="全局图片向量化">

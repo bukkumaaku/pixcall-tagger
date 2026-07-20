@@ -275,9 +275,17 @@ export function installPixcallHost() {
         library: {
             get name() { return pixcallClient.libraryName; },
             get path() { return pixcallClient.libraryNamespace; },
+            info: async () => {
+                await pixcallClient.getSettings();
+                return {
+                    name: pixcallClient.libraryName,
+                    path: pixcallClient.libraryNamespace,
+                };
+            },
         },
         item: {
             getSelected: () => pixcallClient.getSelectedItems(),
+            list: () => pixcallClient.getAllItems(),
             getAll: () => pixcallClient.getAllItems(),
             get: () => pixcallClient.getAllItems(),
             getAllIds: () => pixcallClient.getAllItemIds(),

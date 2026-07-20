@@ -2,9 +2,14 @@ import type { PixcallItem } from "./services/pixcallClient";
 
 declare global {
     const eagle: {
-        library: { name: string; path: string };
+        library: {
+            name: string;
+            path: string;
+            info(): Promise<{ name: string; path: string }>;
+        };
         item: {
             getSelected(): Promise<PixcallItem[]>;
+            list(options?: { limit?: number }): Promise<PixcallItem[]>;
             getAll(): Promise<PixcallItem[]>;
             getAllIds(): Promise<string[]>;
             get(options?: unknown): Promise<PixcallItem[]>;
