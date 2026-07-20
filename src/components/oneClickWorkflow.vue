@@ -147,7 +147,7 @@
             </div>
         </section>
         <div class="workflow-engines" aria-hidden="true">
-            <wdTypeTagger ref="wdRef" /><llmTypeTagger ref="llmRef" /><semanticSearch ref="semanticRef" />
+            <wdTypeTagger ref="wdRef" engine-only /><llmTypeTagger ref="llmRef" /><semanticSearch ref="semanticRef" />
         </div>
     </main>
 </template>

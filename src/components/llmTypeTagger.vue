@@ -784,7 +784,7 @@ import {
 
 <template>
     <div v-if="isReady" class="llm-page">
-        <n-form :model="formData" label-placement="left" label-width="auto">
+        <n-form :model="formData" label-placement="left" :label-width="120">
             <n-form-item :label="t('index.progress')">
                 <div class="progress-block">
                     <div class="progress-meta">
@@ -884,7 +884,6 @@ import {
                     secondary
                     :loading="isRestoring"
                     :disabled="!selectedBackup || isProcessing"
-                    style="margin-left: 10px"
                     @click="restoreSelectedBackup"
                 >
                     {{ promptMode === "annotation" ? "恢复注释" : "恢复标签" }}
@@ -998,7 +997,20 @@ import {
 <style scoped>
     .llm-page {
         width: min(900px, calc(100% - 48px));
-        margin: 30px auto;
+        margin: 30px auto 0;
+        padding-bottom: 40px;
+    }
+
+    .llm-page :deep(.n-form-item-blank) {
+        min-width: 0;
+        gap: 10px;
+    }
+
+    .llm-page :deep(.n-form-item-blank > .n-input),
+    .llm-page :deep(.n-form-item-blank > .n-input-number),
+    .llm-page :deep(.n-form-item-blank > .n-select) {
+        min-width: 0;
+        flex: 1 1 0;
     }
 
     .model-row {
@@ -1033,7 +1045,6 @@ import {
         gap: 10px;
         justify-content: space-between;
         flex-wrap: wrap;
-        padding-left: 88px;
     }
 
     .failure-list {
@@ -1052,7 +1063,6 @@ import {
         .action-row {
             align-items: stretch;
             flex-direction: column;
-            padding-left: 0;
         }
 
     }
