@@ -244,10 +244,16 @@ pub struct EmbeddingSearchTextRequest {
     pub session_id: String,
     pub text: String,
     pub top_k: usize,
+    #[serde(default = "default_true")]
+    pub include_image: bool,
     #[serde(default)]
     pub include_tags: bool,
     #[serde(default)]
     pub include_annotations: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -354,6 +360,20 @@ pub struct WdTaggerVideoRequest {
     pub frame_count: usize,
     pub batch_size: usize,
     pub threshold: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoExtractFramesRequest {
+    pub video_path: String,
+    pub ffmpeg_path: String,
+    pub ffprobe_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoCleanupFramesRequest {
+    pub directory: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -480,6 +500,8 @@ pub enum Command {
     WdTaggerEnqueue(WdTaggerEnqueueRequest),
     WdTaggerBatchComplete(WdTaggerBatchCompleteRequest),
     WdTaggerVideo(WdTaggerVideoRequest),
+    VideoExtractFrames(VideoExtractFramesRequest),
+    VideoCleanupFrames(VideoCleanupFramesRequest),
     WdTaggerUnload(WdTaggerUnloadRequest),
     LlamafileLoad(LlamafileLoadRequest),
     LlamafileProcessImage(LlamafileProcessImageRequest),
@@ -874,6 +896,21 @@ pub struct WdTaggerVideoResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct VideoExtractFramesResult {
+    pub video_path: String,
+    pub duration_seconds: f64,
+    pub frame_paths: Vec<String>,
+    pub directory: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoCleanupFramesResult {
+    pub removed: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WdTaggerUnloadResult {
     pub session_id: String,
     pub removed: bool,
@@ -978,6 +1015,8 @@ pub enum ResultPayload {
     WdTaggerEnqueue(WdTaggerEnqueueResult),
     WdTaggerBatchComplete(WdTaggerBatchCompleteResult),
     WdTaggerVideo(WdTaggerVideoResult),
+    VideoExtractFrames(VideoExtractFramesResult),
+    VideoCleanupFrames(VideoCleanupFramesResult),
     WdTaggerUnload(WdTaggerUnloadResult),
     LlamafileLoad(LlamafileLoadResult),
     LlamafileProcessImage(LlamafileProcessImageResult),
@@ -1098,6 +1137,35 @@ mod tests {
             }
             _ => panic!("expected embedding index annotations command"),
         }
+    }
+
+    #[test]
+    fn parses_video_frame_commands() {
+        let extract: Request = serde_json::from_str(
+            r#"{
+            "protocolVersion": 1,
+            "requestId": "video-extract",
+            "type": "video_extract_frames",
+            "payload": {
+                "videoPath": "video.mp4",
+                "ffmpegPath": "ffmpeg.exe",
+                "ffprobePath": "ffprobe.exe"
+            }
+        }"#,
+        )
+        .unwrap();
+        assert!(matches!(extract.command, Command::VideoExtractFrames(_)));
+
+        let cleanup: Request = serde_json::from_str(
+            r#"{
+            "protocolVersion": 1,
+            "requestId": "video-cleanup",
+            "type": "video_cleanup_frames",
+            "payload": { "directory": "frames" }
+        }"#,
+        )
+        .unwrap();
+        assert!(matches!(cleanup.command, Command::VideoCleanupFrames(_)));
     }
 
     #[test]

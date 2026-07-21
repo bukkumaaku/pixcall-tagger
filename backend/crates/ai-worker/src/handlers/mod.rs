@@ -12,6 +12,7 @@ pub mod remote_vision;
 pub mod scan_embedding_models;
 pub mod scan_wd_models;
 pub mod system_tools;
+pub mod video;
 pub mod wd_tagger;
 pub mod window_control;
 
@@ -163,6 +164,12 @@ impl CommandHandler for BuiltinHandlers {
             }
             Command::WdTaggerVideo(request) => {
                 wd_tagger::tag_video(request, &self.sessions).map(ResultPayload::WdTaggerVideo)
+            }
+            Command::VideoExtractFrames(request) => {
+                video::extract(request).map(ResultPayload::VideoExtractFrames)
+            }
+            Command::VideoCleanupFrames(request) => {
+                video::cleanup(request).map(ResultPayload::VideoCleanupFrames)
             }
             Command::WdTaggerUnload(request) => {
                 wd_tagger::unload(request, &self.sessions).map(ResultPayload::WdTaggerUnload)
