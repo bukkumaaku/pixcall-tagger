@@ -1869,6 +1869,7 @@
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
+        flex: 0 0 100%;
         width: 100%;
         min-width: 0;
     }
