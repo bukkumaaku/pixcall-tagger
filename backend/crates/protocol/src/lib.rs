@@ -806,6 +806,14 @@ pub struct EmbeddingMigrateTextResult {
     pub annotation_indexed_count: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingTextMigrationProgress {
+    pub phase: String,
+    pub completed: u64,
+    pub total: u64,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EmbeddingSearchHit {
@@ -1053,6 +1061,7 @@ pub enum ResultPayload {
 pub enum ProgressPayload {
     DownloadFile(DownloadFileProgress),
     RemoteVisionBatchItem(RemoteVisionBatchItemResult),
+    EmbeddingTextMigration(EmbeddingTextMigrationProgress),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
