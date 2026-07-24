@@ -47,6 +47,7 @@
         EmbeddingHealthResult,
         EmbeddingModelInfo,
         EmbeddingSearchHit,
+        EmbeddingStatusResult,
     } from "../protocol";
     import { backenAPI, config, configRevision, dialog, notification, t } from "../api/backen";
     import { getBackendClient } from "../services/backendClient";
@@ -56,6 +57,9 @@
         cacheSemanticIndexStatus,
         invalidateSemanticIndexStatus,
         scanLocalEmbeddingModels,
+        endpointRemoteModelKey,
+        remoteModelKey,
+        type SemanticIndexStatusTarget,
     } from "../services/semanticIndexStatus";
     import { pixcallClient } from "../services/pixcallClient";
     import {
@@ -133,6 +137,11 @@
     const tagIndexFailures = ref<string[]>([]);
     const annotationDocumentCount = ref(0);
     const annotationIndexedCount = ref(0);
+    const reusableImageCount = ref(0);
+    const reusableTagCount = ref(0);
+    const reusableAnnotationCount = ref(0);
+    const legacyMigrationTarget = ref<SemanticIndexStatusTarget | null>(null);
+    const isMigratingLegacyVectors = ref(false);
     const libraryAnnotationCount = ref(0);
     const isAnnotationIndexing = ref(false);
     const annotationIndexStatus = ref("就绪");
@@ -201,24 +210,7 @@
             return MAX_OPENAI_CONCURRENCY;
         return MAX_LOCAL_BATCH_SIZE;
     });
-    const remoteModelKey = (
-        provider: "open_ai" | "gemini",
-        model: string,
-        dimension: number,
-    ) => {
-        const identity = [provider, model.trim(), dimension].join("\u0000");
-        const digest = stableHash(identity);
-        return `${provider}:${model}:${dimension || "auto"}:${digest}`;
-    };
-    const stableHash = (value: string) => {
-        let first = 0x811c9dc5;
-        let second = 0x9e3779b9;
-        for (let index = 0; index < value.length; index++) {
-            first = Math.imul(first ^ value.charCodeAt(index), 0x01000193);
-            second = Math.imul(second ^ value.charCodeAt(index), 0x85ebca6b);
-        }
-        return `${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0).toString(16).padStart(8, "0")}`;
-    };
+    const reusableVectorCount = computed(() => reusableImageCount.value + reusableTagCount.value + reusableAnnotationCount.value);
     const indexPercentage = computed(() =>
         totalImages.value === 0
             ? 0
@@ -391,7 +383,7 @@
                     apiKey: "",
                     legacyModelKey: "",
                 })),
-                ...profiles.filter((profile) => profile.model && profile.endpoint).map((profile) => ({ name: `${profile.name || profile.model} · ${profile.model}`, modelKey: remoteModelKey(profile.provider, profile.model, profile.provider === "gemini" ? profile.dimension : 0), modelPath: "", tokenizerPath: "", dimension: profile.provider === "gemini" ? profile.dimension : 0, provider: profile.provider, remoteModel: profile.model, selectionKey: `remote:${profile.id}`, endpoint: profile.endpoint, apiKey: profile.apiKey, legacyModelKey: "" })),
+                ...profiles.filter((profile) => profile.model && profile.endpoint).map((profile) => { const dimension = profile.provider === "gemini" ? profile.dimension : 0; return { name: `${profile.name || profile.model} · ${profile.model}`, modelKey: remoteModelKey(profile.provider, profile.model, dimension), modelPath: "", tokenizerPath: "", dimension, provider: profile.provider, remoteModel: profile.model, selectionKey: `remote:${profile.id}`, endpoint: profile.endpoint, apiKey: profile.apiKey, legacyModelKey: endpointRemoteModelKey(profile.provider, profile.endpoint, profile.model, dimension) }; }),
             ];
             if (
                 !models.value.some(
@@ -421,6 +413,7 @@
                 dimension: model.dimension,
                 legacyModelKey: model.legacyModelKey,
             };
+            legacyMigrationTarget.value = target;
             const cached = getCachedSemanticIndexStatus(target);
             if (cached) {
                 applyIndexStatus(cached);
@@ -437,20 +430,42 @@
         }
     }
 
-    function applyIndexStatus(status: {
-        indexedCount: number;
-        tagDocumentCount: number;
-        tagIndexedCount: number;
-        tagLinkCount: number;
-        annotationDocumentCount: number;
-        annotationIndexedCount: number;
-    }) {
+    function applyIndexStatus(status: EmbeddingStatusResult) {
             indexedCount.value = status.indexedCount;
             tagDocumentCount.value = status.tagDocumentCount;
             tagIndexedCount.value = status.tagIndexedCount;
             tagLinkCount.value = status.tagLinkCount;
             annotationDocumentCount.value = status.annotationDocumentCount;
             annotationIndexedCount.value = status.annotationIndexedCount;
+            reusableImageCount.value = status.reusableImageCount || 0;
+            reusableTagCount.value = status.reusableTagCount || 0;
+            reusableAnnotationCount.value = status.reusableAnnotationCount || 0;
+    }
+
+    async function migrateReusableVectors() {
+        const target = legacyMigrationTarget.value;
+        if (!target || isMigratingLegacyVectors.value || reusableVectorCount.value === 0) return;
+        const taskId = beginTask("embedding", "迁移可复用向量", reusableVectorCount.value, false);
+        if (!taskId) return;
+        activeSemanticTaskId.value = taskId;
+        isMigratingLegacyVectors.value = true;
+        updateTask(taskId, { detail: "正在迁移旧索引" });
+        try {
+            const result = await getBackendClient().migrateEmbeddingText(
+                target.databasePath, target.namespace, target.modelKey, target.dimension, target.legacyModelKey,
+                (progress) => updateTask(taskId, { detail: progress.phase, completed: progress.completed, total: progress.total }),
+            );
+            invalidateSemanticIndexStatus();
+            applyIndexStatus(await fetchSemanticIndexStatus(target, true));
+            completeTask(taskId, "可复用向量迁移完成");
+            notification(`迁移完成：图片 ${result.imageIndexedCount}，标签 ${result.tagIndexedCount}，注释 ${result.annotationIndexedCount}`, "success");
+        } catch (error) {
+            failTask(taskId, error);
+            notification(`向量迁移失败：${errorMessage(error)}`, "error");
+        } finally {
+            isMigratingLegacyVectors.value = false;
+            activeSemanticTaskId.value = "";
+        }
     }
 
     async function ensureSession() {
@@ -514,7 +529,7 @@
             annotationIndexedCount.value = result.annotationIndexedCount;
             cacheSemanticIndexStatus(
                 { databasePath, namespace, modelKey: model.modelKey, dimension: model.dimension, legacyModelKey: model.legacyModelKey },
-                result,
+                { ...result, reusableImageCount: reusableImageCount.value, reusableTagCount: reusableTagCount.value, reusableAnnotationCount: reusableAnnotationCount.value },
             );
             loadedSignature.value = signature;
             loadedModelKey.value = model.selectionKey;
@@ -846,7 +861,7 @@
             healthResult.value = await getBackendClient().embeddingHealth(
                 SESSION_ID,
                 itemIds,
-                true,
+                false,
             );
             for (const item of healthResult.value.missingFiles) {
                 recordFailure({
@@ -1248,6 +1263,13 @@
             class="failure-alert"
         >
             {{ libraryReadError }}
+        </n-alert>
+
+        <n-alert v-if="reusableVectorCount > 0" title="发现可复用旧索引" type="info" class="failure-alert">
+            图片 {{ reusableImageCount }}，标签 {{ reusableTagCount }}，注释 {{ reusableAnnotationCount }}
+            <n-button size="small" type="primary" :loading="isMigratingLegacyVectors" :disabled="!!activeSemanticTaskId" @click="migrateReusableVectors">
+                迁移到当前模型
+            </n-button>
         </n-alert>
 
         <TaskControlButtons v-if="activeSemanticTaskId" :task-id="activeSemanticTaskId" class="semantic-task-controls" />

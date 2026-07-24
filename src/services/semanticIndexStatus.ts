@@ -123,7 +123,7 @@ async function resolveSemanticIndexStatusTarget(): Promise<SemanticIndexStatusTa
                 selectionKey: `remote:${profile.id}`,
                 modelKey: remoteModelKey(profile.provider, profile.model, dimension),
                 dimension,
-                legacyModelKey: "",
+                legacyModelKey: endpointRemoteModelKey(profile.provider, profile.endpoint, profile.model, dimension),
             };
         }),
     ];
@@ -148,8 +148,12 @@ const stableHash = (value: string) => {
     return `${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0).toString(16).padStart(8, "0")}`;
 };
 
-function remoteModelKey(provider: "open_ai" | "gemini", model: string, dimension: number) {
+export function remoteModelKey(provider: "open_ai" | "gemini", model: string, dimension: number) {
     return `${provider}:${model}:${dimension || "auto"}:${stableHash([provider, model.trim(), dimension].join("\u0000"))}`;
+}
+
+export function endpointRemoteModelKey(provider: "open_ai" | "gemini", endpoint: string, model: string, dimension: number) {
+    return `${provider}:${model}:${dimension || "auto"}:${stableHash([provider, endpoint.trim().replace(/\/+$/, ""), model.trim(), dimension].join("\u0000"))}`;
 }
 
 async function resolveLibraryNamespace(): Promise<string> {
