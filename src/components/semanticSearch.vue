@@ -49,7 +49,7 @@
         EmbeddingSearchHit,
         EmbeddingStatusResult,
     } from "../protocol";
-    import { backenAPI, config, configRevision, dialog, notification, t } from "../api/backen";
+    import { backenAPI, config, configLoaded, configRevision, dialog, notification, t } from "../api/backen";
     import { getBackendClient } from "../services/backendClient";
     import {
         fetchSemanticIndexStatus,
@@ -185,6 +185,8 @@
     let searchGeneration = 0;
     let previewClickTimer: ReturnType<typeof setTimeout> | undefined;
     let settingsSaveTimer: ReturnType<typeof setTimeout> | undefined;
+    let settingsDirty = false;
+    let lastModelConfigSignature = "";
 
     const modelOptions = computed(() =>
         models.value.map((model) => ({
@@ -252,7 +254,7 @@
 
     onMounted(async () => {
         try {
-            await backenAPI.getConfig();
+            if (!configLoaded.value) await backenAPI.getConfig();
             negativePromptWeight.value = normalizeNegativePromptWeight(
                 config.negativePromptWeight,
             );
@@ -271,12 +273,12 @@
                 Math.max(128, Number(config.embeddingDimension) || 1536),
             );
             await refreshModels();
+            lastModelConfigSignature = modelConfigSignature();
             const statusPromise = refreshIndexStatus();
             void refreshLibraryCounts().catch((error) => {
                 notification(errorMessage(error), "error");
             });
             await statusPromise;
-            await persistSettings();
             isReady.value = true;
         } catch (error) {
             notification(errorMessage(error), "error");
@@ -287,16 +289,20 @@
         disposed = true;
         searchGeneration += 1;
         if (previewClickTimer) clearTimeout(previewClickTimer);
+        const shouldPersistSettings = settingsDirty || !!settingsSaveTimer;
         if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
         settingsSaveTimer = undefined;
-        if (isReady.value) void persistSettings();
+        if (isReady.value && shouldPersistSettings) void persistSettings();
         searchResultObserver?.disconnect();
         masonryResizeObserver?.disconnect();
         void getBackendClient().unloadEmbedding(SESSION_ID).catch(() => {});
     });
 
     watch([selectedModel, batchSize, negativePromptWeight], () => {
-        if (isReady.value) schedulePersistSettings();
+        if (isReady.value) {
+            settingsDirty = true;
+            schedulePersistSettings();
+        }
     });
     watch(selectedModel, () => {
         if (isReady.value) void refreshIndexStatus();
@@ -305,7 +311,10 @@
         if (batchSize.value > maximum) batchSize.value = maximum;
     });
     watch(configRevision, () => {
-        if (isReady.value) void refreshModels();
+        const signature = modelConfigSignature();
+        if (!isReady.value || signature === lastModelConfigSignature) return;
+        lastModelConfigSignature = signature;
+        void refreshModels().then(() => refreshIndexStatus());
     });
     watch(canIncludeTags, (enabled) => {
         if (!enabled) includeTags.value = false;
@@ -351,6 +360,7 @@
             negativePromptWeight.value,
         );
         await backenAPI.setConfig();
+        settingsDirty = false;
     }
 
     function schedulePersistSettings() {
@@ -440,6 +450,10 @@
             reusableImageCount.value = status.reusableImageCount || 0;
             reusableTagCount.value = status.reusableTagCount || 0;
             reusableAnnotationCount.value = status.reusableAnnotationCount || 0;
+    }
+
+    function modelConfigSignature() {
+        return JSON.stringify([config.modelLocation, config.embeddingRemoteProfiles, config.embeddingModelName, config.endpoint, config.apiKey, config.embeddingProvider, config.embeddingDimension]);
     }
 
     async function migrateReusableVectors() {
