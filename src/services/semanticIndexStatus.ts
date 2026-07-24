@@ -113,17 +113,21 @@ async function resolveSemanticIndexStatusTarget(): Promise<SemanticIndexStatusTa
                 apiKey: config.apiKey,
                 model: config.embeddingModelName,
                 dimension: config.embeddingDimension,
+                resolvedModelKey: config.embeddingResolvedModelKey,
             }]
           : [];
     const models = [
         ...localModels.map((model) => ({ selectionKey: model.modelKey, modelKey: model.modelKey, dimension: model.dimension, legacyModelKey: "" })),
         ...profiles.filter((profile) => profile.model && profile.endpoint).map((profile) => {
-            const dimension = profile.provider === "gemini" ? profile.dimension : 0;
+            const dimension = profile.provider === "gemini" || profile.resolvedModelKey ? profile.dimension : 0;
+            const modelKey = profile.resolvedModelKey || remoteModelKey(profile.provider, profile.model, dimension);
             return {
                 selectionKey: `remote:${profile.id}`,
-                modelKey: remoteModelKey(profile.provider, profile.model, dimension),
+                modelKey,
                 dimension,
-                legacyModelKey: endpointRemoteModelKey(profile.provider, profile.endpoint, profile.model, dimension),
+                legacyModelKey: profile.resolvedModelKey
+                    ? remoteModelKey(profile.provider, profile.model, 0)
+                    : endpointRemoteModelKey(profile.provider, profile.endpoint, profile.model, dimension),
             };
         }),
     ];

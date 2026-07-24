@@ -18,7 +18,7 @@ export type DownloadFileRequest = {
     destination: string;
 };
 
-export type RemoteEmbeddingProfile = { id: string; name: string; provider: "open_ai" | "gemini"; endpoint: string; apiKey: string; model: string; dimension: number };
+export type RemoteEmbeddingProfile = { id: string; name: string; provider: "open_ai" | "gemini"; endpoint: string; apiKey: string; model: string; dimension: number; resolvedModelKey?: string };
 export type RemoteLlmProfile = { id: string; name: string; provider: "open_ai" | "gemini"; endpoint: string; apiKey: string; model: string };
 export type Config = {
     [key: string]: string | number | boolean | string[] | RemoteEmbeddingProfile[] | RemoteLlmProfile[];
@@ -31,6 +31,7 @@ export type Config = {
     llmRemoteConcurrency: number;
     embeddingProvider: EmbeddingProvider;
     embeddingDimension: number;
+    embeddingResolvedModelKey: string;
     embeddingRemoteProfiles: RemoteEmbeddingProfile[];
     embeddingRemoteProfileId: string;
     llmRemoteProfiles: RemoteLlmProfile[];
@@ -411,6 +412,7 @@ export type ScanEmbeddingModelsResult = {
 export type EmbeddingLoadResult = {
     sessionId: string;
     modelKey: string;
+    dimension: number;
     indexedCount: number;
     tagDocumentCount: number;
     tagIndexedCount: number;
