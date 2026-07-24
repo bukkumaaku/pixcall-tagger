@@ -55,6 +55,7 @@
         getCachedSemanticIndexStatus,
         cacheSemanticIndexStatus,
         invalidateSemanticIndexStatus,
+        scanLocalEmbeddingModels,
     } from "../services/semanticIndexStatus";
     import { pixcallClient } from "../services/pixcallClient";
     import {
@@ -279,7 +280,7 @@
             );
             await refreshModels();
             const statusPromise = refreshIndexStatus();
-            void refreshLibraryCounts(true).catch((error) => {
+            void refreshLibraryCounts().catch((error) => {
                 notification(errorMessage(error), "error");
             });
             await statusPromise;
@@ -378,13 +379,7 @@
     async function refreshModels() {
         isLoadingModels.value = true;
         try {
-            const localModels = config.modelLocation
-                ? (
-                      await getBackendClient().scanEmbeddingModels(
-                          config.modelLocation,
-                      )
-                  ).models
-                : [];
+            const localModels = await scanLocalEmbeddingModels(config.modelLocation);
             const profiles = config.embeddingRemoteProfiles?.length ? config.embeddingRemoteProfiles : (config.embeddingModelName && config.endpoint ? [{ id: "legacy", name: "远程接口", provider: config.embeddingProvider === "gemini" ? "gemini" as const : "open_ai" as const, endpoint: config.endpoint, apiKey: config.apiKey, model: config.embeddingModelName, dimension: config.embeddingDimension }] : []);
             models.value = [
                 ...localModels.map((model) => ({
@@ -426,15 +421,10 @@
                 dimension: model.dimension,
                 legacyModelKey: model.legacyModelKey,
             };
-            const cached = getCachedSemanticIndexStatus(target, Number.POSITIVE_INFINITY);
+            const cached = getCachedSemanticIndexStatus(target);
             if (cached) {
                 applyIndexStatus(cached);
                 isIndexStatusLoading.value = false;
-                void fetchSemanticIndexStatus(target, true)
-                    .then((result) => {
-                        applyIndexStatus(result);
-                    })
-                    .catch((error) => console.warn("后台刷新语义索引状态失败", error));
                 return;
             }
             const status = await fetchSemanticIndexStatus(target);
@@ -575,61 +565,19 @@
         throw new Error(`${apiName} 未返回条目数组`);
     }
 
-    async function listLibraryItems(): Promise<PixcallImage[]> {
-        const attempts: Array<{
-            name: string;
-            run: () => Promise<unknown>;
-        }> = [];
-        if (typeof eagle.item?.list === "function") {
-            attempts.push({
-                name: "eagle.item.list",
-                run: () => eagle.item.list({ limit: 999999 }),
-            });
+    async function getLibrarySnapshot() {
+        const result = await pixcallClient.getLibrarySnapshot();
+        const items = normalizeLibraryItems(result.items, "Pixcall 图库快照");
+        if (!items.every((item) => typeof item.id === "string" && item.id.length > 0)) {
+            throw new Error("Pixcall 图库快照缺少条目 ID，已取消索引清理");
         }
-        if (typeof eagle.item?.getAll === "function") {
-            attempts.push({
-                name: "eagle.item.getAll",
-                run: () => eagle.item.getAll(),
-            });
-        }
-        if (typeof eagle.item?.get === "function") {
-            attempts.push({
-                name: "eagle.item.get",
-                run: () => eagle.item.get(),
-            });
-        }
-
-        let emptyResult: PixcallImage[] | undefined;
-        const failures: string[] = [];
-        for (const attempt of attempts) {
-            try {
-                const items = normalizeLibraryItems(await attempt.run(), attempt.name);
-                if (items.length === 0) {
-                    emptyResult = items;
-                    continue;
-                }
-                if (items.some((item) => Boolean(item.filePath || item.thumbnailPath))) {
-                    return items;
-                }
-                failures.push(`${attempt.name} 返回字段不完整`);
-            } catch (error) {
-                failures.push(`${attempt.name}: ${errorMessage(error)}`);
-            }
-        }
-
-        if (emptyResult) return emptyResult;
-        const detail = failures.length ? `：${failures.join("；")}` : "";
-        throw new Error(`无法读取 Pixcall 图库条目${detail}`);
-    }
-
-    async function getLibraryImages(): Promise<PixcallImage[]> {
-        const items = await listLibraryItems();
-        return items.filter(
+        const images = items.filter(
             (item) =>
                 !item.isDeleted &&
                 IMAGE_EXTENSIONS.has(itemExtension(item)) &&
                 Boolean(item.filePath || item.thumbnailPath),
         );
+        return { items, images, itemIds: result.itemIds };
     }
 
     function itemExtension(item: PixcallImage) {
@@ -637,14 +585,6 @@
         if (explicit) return explicit;
         const source = item.filePath || item.thumbnailPath || item.name || "";
         return source.split(/[\\/]/).pop()?.match(/\.([^.]+)$/)?.[1].toLowerCase() || "";
-    }
-
-    async function getLibraryItemIds(): Promise<string[]> {
-        const ids = await eagle.item.getAllIds();
-        if (!Array.isArray(ids)) {
-            throw new Error("无法完整读取图库条目 ID，已取消索引清理");
-        }
-        return [...new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0))];
     }
 
     function applyLibraryCounts(images: PixcallImage[]) {
@@ -662,28 +602,15 @@
         libraryCountsReady.value = true;
     }
 
-    async function refreshLibraryCounts(retryEmpty = false) {
-        const attemptCount = retryEmpty ? 4 : 1;
-        for (let attempt = 0; attempt < attemptCount; attempt++) {
-            try {
-                const images = await getLibraryImages();
-                if (images.length === 0 && attempt + 1 < attemptCount) {
-                    await delay(250 * 2 ** attempt);
-                    continue;
-                }
-                applyLibraryCounts(images);
-                libraryReadError.value = "";
-                return;
-            } catch (error) {
-                if (attempt + 1 < attemptCount) {
-                    await delay(250 * 2 ** attempt);
-                    continue;
-                }
-                libraryCountsReady.value = false;
-                libraryReadError.value = errorMessage(error);
-                console.error("读取 Pixcall 图库统计失败", error);
-                throw error;
-            }
+    async function refreshLibraryCounts() {
+        try {
+            applyLibraryCounts((await getLibrarySnapshot()).images);
+            libraryReadError.value = "";
+        } catch (error) {
+            libraryCountsReady.value = false;
+            libraryReadError.value = errorMessage(error);
+            console.error("读取 Pixcall 图库统计失败", error);
+            throw error;
         }
     }
 
@@ -711,7 +638,7 @@
         invalidateSemanticIndexStatus();
         isAnnotationIndexing.value = true; annotationIndexFailures.value = []; annotationIndexStatus.value = "正在加载模型";
         try {
-            await ensureSession(); const images = targetItems || await getLibraryImages(); applyLibraryCounts(images);
+            await ensureSession(); const snapshot = targetItems ? null : await getLibrarySnapshot(); const images = targetItems || snapshot!.images; applyLibraryCounts(images);
             annotationTotalItems.value = images.length; annotationProcessedItems.value = 0;
             const size = Math.max(20, batchSize.value * 4);
             for (let offset = 0; offset < images.length; offset += size) {
@@ -722,7 +649,7 @@
                 annotationIndexFailures.value.push(...result.failures.map((failure) => `${failure.itemId}：${failure.error}`));
                 updateTask(taskId, { detail: annotationIndexStatus.value, completed: annotationProcessedItems.value, total: images.length });
             }
-            if (!targetItems) { const pruned = await getBackendClient().pruneEmbeddingAnnotations(SESSION_ID, images.map((image) => image.id)); annotationIndexedCount.value = pruned.totalAnnotations; }
+            if (snapshot) { const pruned = await getBackendClient().pruneEmbeddingAnnotations(SESSION_ID, snapshot.itemIds); annotationIndexedCount.value = pruned.totalAnnotations; }
             annotationIndexStatus.value = annotationIndexFailures.value.length ? "完成，部分注释失败" : "注释索引完成"; completeTask(taskId, annotationIndexStatus.value);
         } catch (error) { if (isTaskCancelled(error)) { annotationIndexStatus.value = "已取消"; cancelTask(taskId); } else { annotationIndexStatus.value = "注释索引失败"; failTask(taskId, error); notification(errorMessage(error), "error"); } }
         finally { isAnnotationIndexing.value = false; activeSemanticTaskId.value = ""; }
@@ -744,14 +671,14 @@
         try {
             updateTask(taskId, { detail: "正在加载模型" });
             await ensureSession();
-            const images = targetItems || await getLibraryImages();
+            const snapshot = targetItems ? null : await getLibrarySnapshot();
+            const images = targetItems || snapshot!.images;
             applyLibraryCounts(images);
             if (images.length === 0) {
                 throw new Error("没有找到可索引的图片，已保留现有索引");
             }
-            if (!targetItems) {
-                const itemIds = await getLibraryItemIds();
-                const pruneResult = await getBackendClient().pruneEmbedding(SESSION_ID, itemIds);
+            if (snapshot) {
+                const pruneResult = await getBackendClient().pruneEmbedding(SESSION_ID, snapshot.itemIds);
                 indexedCount.value = pruneResult.totalIndexed;
             }
             totalImages.value = images.length;
@@ -833,7 +760,8 @@
         tagIndexStatus.value = "正在加载模型";
         try {
             await ensureSession();
-            const images = targetItems || await getLibraryImages();
+            const snapshot = targetItems ? null : await getLibrarySnapshot();
+            const images = targetItems || snapshot!.images;
             applyLibraryCounts(images);
             if (images.length === 0) throw new Error("没有找到可处理的图片");
             tagTotalItems.value = images.length;
@@ -868,7 +796,7 @@
                 );
                 updateTask(taskId, { detail: tagIndexStatus.value, completed: tagProcessedItems.value });
             }
-            if (!targetItems) { const pruned = await getBackendClient().pruneEmbeddingTags(SESSION_ID, images.map((image) => image.id)); tagIndexedCount.value = pruned.totalTags; tagLinkCount.value = pruned.totalLinks; }
+            if (snapshot) { const pruned = await getBackendClient().pruneEmbeddingTags(SESSION_ID, snapshot.itemIds); tagIndexedCount.value = pruned.totalTags; tagLinkCount.value = pruned.totalLinks; }
             tagIndexStatus.value = tagIndexFailures.value.length ? "完成，部分标签失败" : "标签索引完成";
             completeTask(taskId, tagIndexStatus.value);
             notification(`已索引 ${tagIndexedCount.value} 个标签`, tagIndexFailures.value.length ? "warning" : "success");
@@ -911,8 +839,9 @@
         try {
             updateTask(taskId, { detail: "正在比对 Pixcall 图片与索引" });
             await ensureSession();
-            const images = await getLibraryImages();
-            const itemIds = await getLibraryItemIds();
+            const snapshot = await getLibrarySnapshot();
+            const images = snapshot.images;
+            const itemIds = snapshot.itemIds;
             applyLibraryCounts(images);
             healthResult.value = await getBackendClient().embeddingHealth(
                 SESSION_ID,
@@ -954,8 +883,9 @@
         const taskId = beginTask("embedding", "清理冗余索引");
         if (!taskId) return;
         try {
-            const images = await getLibraryImages();
-            const itemIds = await getLibraryItemIds();
+            const snapshot = await getLibrarySnapshot();
+            const images = snapshot.images;
+            const itemIds = snapshot.itemIds;
             if (images.length === 0) {
                 throw new Error("没有找到当前图片，已取消清理");
             }
@@ -1225,9 +1155,6 @@
         });
     }
 
-    function delay(milliseconds: number) {
-        return new Promise((resolve) => setTimeout(resolve, milliseconds));
-    }
     async function runImageIndexing(items: PixcallImage[]) {
         await startIndexing(items);
         if (indexStatus.value === "索引失败") throw new Error(indexStatus.value);

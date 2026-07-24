@@ -112,6 +112,18 @@ class PixcallClient {
         return this.getAllEntryIds();
     }
 
+    async getLibrarySnapshot() {
+        await this.getSettings();
+        const itemIds = await this.getAllEntryIds();
+        const items = await this.getItems(itemIds);
+        const returnedIds = new Set(items.map((item) => item.id));
+        const missingIds = itemIds.filter((id) => !returnedIds.has(id));
+        if (missingIds.length > 0) {
+            throw new Error(`Pixcall 未返回 ${missingIds.length} 个图库条目，已取消索引清理`);
+        }
+        return { items, itemIds };
+    }
+
     private async getAllEntryIds() {
         const databaseIds = await this.getDatabaseEntryIds();
         if (databaseIds?.length) return databaseIds;
