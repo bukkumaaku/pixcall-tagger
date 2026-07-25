@@ -153,13 +153,20 @@ export type EmbeddingPruneRequest = {
 export type EmbeddingPruneTagsRequest = {
     sessionId: string;
     itemIds: string[];
+    documentIds?: string[];
 };
-export type EmbeddingPruneAnnotationsRequest = { sessionId: string; itemIds: string[] };
+export type EmbeddingPruneAnnotationsRequest = { sessionId: string; itemIds: string[]; documentIds?: string[] };
 
 export type EmbeddingHealthRequest = {
     sessionId: string;
     itemIds: string[];
     repairLegacyEndpoints?: boolean;
+};
+export type EmbeddingTextHealthDocumentInput = { documentId: string; content: string };
+export type EmbeddingTextHealthRequest = {
+    sessionId: string;
+    kind: "tag" | "annotation";
+    documents: EmbeddingTextHealthDocumentInput[];
 };
 
 export type EmbeddingStatusRequest = {
@@ -302,6 +309,7 @@ export type CommandPayloadMap = {
     embedding_prune_tags: EmbeddingPruneTagsRequest;
     embedding_prune_annotations: EmbeddingPruneAnnotationsRequest;
     embedding_health: EmbeddingHealthRequest;
+    embedding_text_health: EmbeddingTextHealthRequest;
     embedding_status: EmbeddingStatusRequest;
     embedding_migrate_text: EmbeddingMigrateTextRequest;
     embedding_search_text: EmbeddingSearchTextRequest;
@@ -487,6 +495,14 @@ export type EmbeddingHealthResult = {
     removedLegacyTableCount: number;
     removedLegacyVectorCount: number;
 };
+export type EmbeddingTextHealthResult = {
+    sessionId: string;
+    kind: "tag" | "annotation";
+    libraryCount: number;
+    indexedCount: number;
+    missingDocumentIds: string[];
+    staleDocumentIds: string[];
+};
 
 export type EmbeddingStatusResult = {
     sessionId: string;
@@ -624,6 +640,7 @@ export type ResultDataMap = {
     embedding_prune_tags: EmbeddingPruneTagsResult;
     embedding_prune_annotations: EmbeddingPruneAnnotationsResult;
     embedding_health: EmbeddingHealthResult;
+    embedding_text_health: EmbeddingTextHealthResult;
     embedding_status: EmbeddingStatusResult;
     embedding_migrate_text: EmbeddingMigrateTextResult;
     embedding_search_text: EmbeddingSearchResult;
