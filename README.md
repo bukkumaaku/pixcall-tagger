@@ -26,6 +26,7 @@ Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和
 - 支持不覆写、覆写和合并已有标签或描述。
 - 当前本地模型包括 Qwen3.5-9B、Qwen3-VL 8B 和 Llama JoyCaption Alpha Two 8B。
 - llamafile 的标准输出和错误输出按日期写入 `模型根目录/logs/YYYY-MM-DD.log`。
+- 本地 LLM 支持自动检测 CUDA、Metal 和 Vulkan；后端不可用时可显示明确诊断并按设置回退到 Vulkan 或 CPU。
 
 ### 图片语义搜索
 

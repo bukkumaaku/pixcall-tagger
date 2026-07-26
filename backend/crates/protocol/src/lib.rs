@@ -432,6 +432,8 @@ pub struct LlamafileLoadRequest {
     #[serde(default)]
     pub gpu: String,
     pub gpu_layers: Option<i32>,
+    #[serde(default = "default_true")]
+    pub allow_gpu_fallback: bool,
     pub startup_timeout_milliseconds: Option<u64>,
     pub request_timeout_milliseconds: Option<u64>,
 }
@@ -995,6 +997,8 @@ pub struct LlamafileLoadResult {
     pub session_id: String,
     pub port: u16,
     pub reused: bool,
+    pub active_gpu: String,
+    pub fallback_reason: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1308,6 +1312,7 @@ mod tests {
                 assert!(payload.log_path.is_empty());
                 assert_eq!(payload.context_size, None);
                 assert_eq!(payload.gpu_layers, None);
+                assert!(payload.allow_gpu_fallback);
             }
             _ => panic!("expected llamafile load command"),
         }
