@@ -107,7 +107,7 @@ Windows 下 WD 和本地 embedding 默认优先使用 DirectML，macOS 默认优
 │       ├── tokenizer.json
 │       └── 其他模型配置文件
 └── llamafile/
-    └── llamafile-0.10.3（平台对应的可执行文件）
+    └── llamafile-0.10.4（平台对应的可执行文件）
 ```
 
 ### WD 模型
