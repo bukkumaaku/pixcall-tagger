@@ -37,7 +37,14 @@ export function extname(filePath: string) {
 export function localAssetUrl(filePath: string) {
     if (/^(?:data:|https?:|file:)/i.test(filePath)) return filePath;
     const normalized = filePath.replace(/\\/g, "/");
-    return `file:///${encodeURI(normalized).replace(/^\/+/, "")}`;
+    const path = normalized.replace(/^\/+/, "");
+    const encodedPath = path
+        .split("/")
+        .map((segment, index) => index === 0 && /^[A-Za-z]:$/.test(segment)
+            ? segment
+            : encodeURIComponent(segment))
+        .join("/");
+    return `file:///${encodedPath}`;
 }
 
 function isAbsolutePath(filePath: string) {

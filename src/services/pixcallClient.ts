@@ -51,6 +51,7 @@ class PixcallClient {
     private entries = new Map<string, PixcallEntry>();
     private tagById = new Map<string, string>();
     private tagByName = new Map<string, string>();
+    private tagCreationQueue: Promise<void> = Promise.resolve();
     private settings: SettingsResponse | null = null;
 
     async request<T>(payload: Record<string, unknown>): Promise<T> {
@@ -254,14 +255,7 @@ class PixcallClient {
         await this.ensureTags();
         const ids: string[] = [];
         for (const name of item.tags) {
-            let id = this.tagByName.get(name);
-            if (!id) {
-                const result = await this.request<{ tag: PixcallTag }>({ type: "create_tag", name });
-                id = normalizeId(result.tag.id);
-                this.tagByName.set(name, id);
-                this.tagById.set(id, name);
-            }
-            ids.push(id);
+            ids.push(await this.ensureTagId(name));
         }
         const result = await this.request<unknown>({
             type: "update_entry",
@@ -276,6 +270,25 @@ class PixcallClient {
             entry.tag_ids = ids;
             entry.description = item.annotation;
         }
+    }
+
+    private ensureTagId(name: string): Promise<string> {
+        const operation = this.tagCreationQueue.then(async () => {
+            await this.ensureTags();
+            const cached = this.tagByName.get(name);
+            if (cached) return cached;
+
+            const result = await this.request<{ tag: PixcallTag }>({ type: "create_tag", name });
+            const id = normalizeId(result.tag.id);
+            this.tagByName.set(name, id);
+            this.tagById.set(id, name);
+            return id;
+        });
+        this.tagCreationQueue = operation.then(
+            () => undefined,
+            () => undefined,
+        );
+        return operation;
     }
 }
 
