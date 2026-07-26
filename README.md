@@ -2,25 +2,9 @@
 
 [English](./README.en.md) | 简体中文
 
-Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和 Rust `ai-worker`，为图片和视频生成标签、描述，并提供语义搜索。
+Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和 Rust `ai-worker`，为图片和视频生成标签与描述，提供一键处理，以及图片、标签和描述的混合语义搜索。
 
-当前版本：`2.1.0`
-
-## 更新日志
-
-### `2.1.0`
-
-- 图片、标签和注释向量改为独立索引，支持加权组合语义搜索。
-- 新增多套远程 embedding 与 LLM 配置、OpenAI Compatible 和 Gemini REST 接口。
-- 新增打标、注释与三类向量化串联的一键处理流程。
-- 新增负向搜索、索引重建恢复、远程 LLM 并发缓存和分类备份。
-- 修复全库枚举、旧 worker 协议、配置并发写入及批量结果丢失问题。
-
-### `2.0.2`
-
-- 首次打开插件且未设置模型目录时，直接打开原生文件夹选择器。
-- 取消选择模型目录时改为轻量警告通知，不再弹出重复确认框。
-- 运行 LLM 前检查 llamafile，缺少运行程序时直接引导下载。
+当前版本：`2.2.0`
 
 ## 功能
 
@@ -35,11 +19,13 @@ Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和
 
 ### LLM 图像理解
 
-- 使用本地 llamafile 和 GGUF 视觉语言模型处理图片。
+- 支持本地 llamafile + GGUF 视觉语言模型，以及 OpenAI Compatible 和 Gemini 原生 REST 远程视觉模型。
+- 支持保存多套远程 LLM profile，并设置远程批量处理并发数。
 - 支持生成标签或写入 Pixcall 描述字段。
 - 标签提示词和描述提示词可以分别编辑、保存和恢复默认值。
 - 支持不覆写、覆写和合并已有标签或描述。
-- 当前内置模型包括 Qwen3.5-9B 和 Qwen3-VL。
+- 当前本地模型包括 Qwen3.5-9B、Qwen3-VL 8B 和 Llama JoyCaption Alpha Two 8B。
+- llamafile 的标准输出和错误输出按日期写入 `模型根目录/logs/YYYY-MM-DD.log`。
 
 ### 图片语义搜索
 
@@ -48,7 +34,17 @@ Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和
 - 支持文字搜图和以图搜图，结果按相似度排序并懒加载显示。
 - 单击结果可预览，双击结果可在 Pixcall 中打开。
 - 支持本地 Jina CLIP v2、OpenAI Compatible 和 Gemini 原生 REST embedding。
+- 支持保存多套远程 embedding profile。
+- 图片、标签和描述分别建立向量索引，可以设置权重进行组合搜索。
+- 支持正向和负向文字条件，并可与以图搜图结果融合。
 - 不同模型、协议和向量维度使用独立 SQLite 向量表。
+- 提供索引健康检查、重建恢复、过期项目清理和失败项列表。
+
+### 一键处理与备份
+
+- 一键串联 WD 打标、LLM 标签、LLM 描述，以及图片、标签和描述向量化。
+- 支持暂停、继续和取消长时间任务，并显示分阶段进度与失败项。
+- 在批量写入前创建标签或描述备份，并可按类别选择备份恢复。
 
 ### Pixcall 集成
 
@@ -68,7 +64,8 @@ Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和
 - 模型下载提供进度和错误提示。
 - 插件启动时检查 GitHub Releases，发现新版本后提示更新。
 - 配置默认保存在用户目录下的 `.pixcall-auto-tagger/config.json5`。
-- 远程 embedding API key 使用操作系统凭据存储保护，不以明文写入配置文件。
+- 远程 embedding 和 LLM profile 的 API key 使用操作系统凭据存储保护，不以明文写入配置文件。
+- 配置通过同目录临时文件原子替换，避免异常退出产生残缺 JSON5。
 
 ## 支持平台
 
@@ -83,7 +80,7 @@ Windows 下 WD 和本地 embedding 默认优先使用 DirectML，macOS 默认优
 插件最低需要 Pixcall `0.9.5`。
 
 1. 打开 [GitHub Releases](https://github.com/bukkumaaku/pixcall-tagger/releases/latest)。
-2. 下载已经编译好的 `pixcall-plugin-v2.1.0.zip`。
+2. 下载已经编译好的 `pixcall-plugin-v2.2.0.zip`。
 3. 解压压缩包。
 4. 打开 Pixcall 的插件管理器，选择“加载插件文件夹”。
 5. 选择解压后的 `release-dist` 文件夹，也就是直接包含 `manifest.json` 的文件夹。
@@ -130,7 +127,9 @@ WD 模型必须放在 `模型根目录/wd/模型名/` 下，并包含对应格�
 当前内置下载列表包括：
 
 - `Qwen3.5-9B-Q4_K_M`
+- `Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M`
 - `Qwen3VL-8B-Instruct-Q4_K_M`
+- `Llama-JoyCaption-Alpha-Two-8B-Q6_K`
 
 每个模型需要放在 `模型根目录/llm/模型名/` 下，并准备 GGUF 主模型和对应的 `mmproj` 文件。llamafile runner 放在 `模型根目录/llamafile/` 下。
 
@@ -147,7 +146,8 @@ WD 模型必须放在 `模型根目录/wd/模型名/` 下，并包含对应格�
 3. 在 WD 页面选择项目、模型、语言、阈值和覆写方式，然后开始打标。
 4. 在 LLM 页面选择模型和操作类型，确认提示词后处理图片。
 5. 在语义搜索页面选择 embedding 模型，先建立索引，再使用文字或图片搜索。
-6. 使用任务中心查看进度、失败文件和后台任务。
+6. 使用一键处理按需串联打标、描述和三类向量索引。
+7. 使用任务中心查看进度、失败文件和后台任务，并在需要时恢复分类备份。
 
 视频读取内容需要系统 `PATH` 中同时存在 `ffmpeg` 和 `ffprobe`。插件会自动检测它们，缺少任意一个时不会启用视频抽帧。
 
@@ -185,7 +185,7 @@ Rust 测试：
 cargo test --manifest-path backend/Cargo.toml --workspace
 ```
 
-GitHub Actions 推送 `main` 会构建 Windows x64 和 macOS ARM64；推送 `v*` 标签会构建跨平台插件，并将 zip 安装包发布到 GitHub Releases。当前标签示例：`v2.1.0`。
+GitHub Actions 推送 `main` 会构建 Windows x64 和 macOS ARM64；推送 `v*` 标签会构建跨平台插件，并将 zip 安装包发布到 GitHub Releases。当前标签示例：`v2.2.0`。
 
 ## 项目结构
 

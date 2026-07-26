@@ -2,25 +2,9 @@
 
 English | [简体中文](./README.md)
 
-Pixcall AI Tagger is a built-in Pixcall plugin with a Vue frontend and a Rust `ai-worker`. It generates tags and descriptions for images and videos and provides semantic search over a Pixcall library.
+Pixcall AI Tagger is a built-in Pixcall plugin with a Vue frontend and a Rust `ai-worker`. It generates tags and descriptions for images and videos, provides one-click workflows, and combines semantic search over images, tags, and descriptions.
 
-Current version: `2.1.0`
-
-## Changelog
-
-### `2.1.0`
-
-- Split image, tag, and annotation vectors into independent indexes with weighted combined semantic search.
-- Added multiple remote embedding and LLM profiles with OpenAI-compatible and native Gemini REST APIs.
-- Added a one-click workflow for tagging, annotation generation, and all three vectorization stages.
-- Added negative search, index rebuild and recovery, remote LLM concurrency and cache management, and categorized backups.
-- Fixed full-library enumeration, stale worker protocols, concurrent config writes, and lost partial batch results.
-
-### `2.0.2`
-
-- Open the native model-folder picker directly on first launch when no model directory is configured.
-- Show a lightweight warning notification when the directory selection is cancelled instead of stacking confirmation dialogs.
-- Check for the llamafile runner before LLM processing and guide the user to download it when missing.
+Current version: `2.2.0`
 
 ## Features
 
@@ -35,11 +19,13 @@ Current version: `2.1.0`
 
 ### LLM image understanding
 
-- Uses a local llamafile and GGUF vision-language model to process images.
+- Supports local llamafile + GGUF vision-language models and remote OpenAI-compatible or native Gemini REST vision models.
+- Stores multiple remote LLM profiles and supports configurable concurrency for remote batches.
 - Can generate tags or write a description to Pixcall.
 - Tag and description prompts can be edited, saved independently, and restored to defaults.
 - Supports skip, overwrite, and merge modes for existing tags or descriptions.
-- The built-in model list includes Qwen3.5-9B and Qwen3-VL.
+- Built-in local models include Qwen3.5-9B, Qwen3-VL 8B, and Llama JoyCaption Alpha Two 8B.
+- llamafile stdout and stderr are written by date to `model-root/logs/YYYY-MM-DD.log`.
 
 ### Semantic image search
 
@@ -48,7 +34,17 @@ Current version: `2.1.0`
 - Supports text-to-image and image-to-image search with similarity sorting and lazy result loading.
 - Click a result to preview it and double-click to open it in Pixcall.
 - Supports local Jina CLIP v2, OpenAI Compatible, and native Gemini REST embeddings.
+- Stores multiple remote embedding profiles.
+- Indexes images, tags, and descriptions separately and combines them with configurable weights.
+- Supports positive and negative text conditions combined with image similarity.
 - Different models, protocols, and vector dimensions use separate SQLite vector tables.
+- Provides index health checks, rebuild recovery, stale-item cleanup, and failure reporting.
+
+### One-click workflows and backups
+
+- Runs WD tagging, LLM tagging, LLM description generation, and image/tag/description vectorization as one configurable workflow.
+- Supports pausing, resuming, and cancelling long tasks with stage progress and failure reporting.
+- Creates categorized tag or description backups before batch writes and allows restoring a selected backup.
 
 ### Pixcall integration
 
@@ -68,7 +64,8 @@ Current version: `2.1.0`
 - Model downloads report progress and surface errors.
 - The plugin checks GitHub Releases on startup and reports available updates.
 - Configuration is stored at `.pixcall-auto-tagger/config.json5` under the current user's home directory.
-- Remote embedding API keys are protected by the operating system credential store and are not written to the config file in plain text.
+- Remote embedding and LLM profile API keys are protected by the operating system credential store and are not written to the config file in plain text.
+- Configuration writes use an atomic same-directory replacement so an interrupted write cannot leave partial JSON5.
 
 ## Supported platforms
 
@@ -83,7 +80,7 @@ WD and local embedding inference use DirectML first on Windows and CoreML first 
 Pixcall `0.9.5` or newer is required.
 
 1. Open [GitHub Releases](https://github.com/bukkumaaku/pixcall-tagger/releases/latest).
-2. Download the prebuilt `pixcall-plugin-v2.1.0.zip` package.
+2. Download the prebuilt `pixcall-plugin-v2.2.0.zip` package.
 3. Extract the archive.
 4. Open Pixcall's plugin manager and choose **Load Plugin Folder**.
 5. Select the extracted `release-dist` directory, which directly contains `manifest.json`.
@@ -130,7 +127,9 @@ WD models must be placed under `model-root/wd/model-name/` with the model files 
 The built-in download list currently includes:
 
 - `Qwen3.5-9B-Q4_K_M`
+- `Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M`
 - `Qwen3VL-8B-Instruct-Q4_K_M`
+- `Llama-JoyCaption-Alpha-Two-8B-Q6_K`
 
 Each model belongs under `model-root/llm/model-name/` and requires a GGUF main model plus its corresponding `mmproj` file. Place the platform-specific llamafile runner under `model-root/llamafile/`.
 
@@ -147,7 +146,8 @@ For remote embeddings, configure a service base URL, API key, model name, and th
 3. In WD Tagger, select assets, a model, language, threshold, and overwrite mode, then start tagging.
 4. In LLM Image Understanding, select a model and operation, review the prompt, and process the image.
 5. In Semantic Search, select an embedding model, build an index, and then search by text or image.
-6. Use the task center to monitor progress, failed files, and background tasks.
+6. Use One-click Workflow to combine tagging, description generation, and all three vector indexes as needed.
+7. Use the task center to monitor progress, failed files, and background tasks, and restore categorized backups when required.
 
 Video content reading requires both `ffmpeg` and `ffprobe` on the system `PATH`. The plugin detects them automatically and disables video frame extraction if either tool is missing.
 
@@ -185,7 +185,7 @@ Rust tests:
 cargo test --manifest-path backend/Cargo.toml --workspace
 ```
 
-GitHub Actions builds Windows x64 and macOS ARM64 when `main` is pushed. Pushing a `v*` tag builds the cross-platform plugin and publishes its zip package to GitHub Releases. The current tag example is `v2.1.0`.
+GitHub Actions builds Windows x64 and macOS ARM64 when `main` is pushed. Pushing a `v*` tag builds the cross-platform plugin and publishes its zip package to GitHub Releases. The current tag example is `v2.2.0`.
 
 ## Project structure
 
