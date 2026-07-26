@@ -39,7 +39,7 @@ pub fn load(
         .map_err(session_error)?
     {
         let session = handle.lock().map_err(session_error)?;
-        if session.config() != &config {
+        if !same_session_config(session.config(), &config) {
             return Err(HandlerError::new(
                 "LLAMAFILE_SESSION_CONFIG_MISMATCH",
                 format!(
@@ -131,6 +131,7 @@ fn build_config(request: LlamafileLoadRequest) -> LlamafileConfig {
         request.model_path,
         request.mmproj_path,
     );
+    config.log_path = (!request.log_path.trim().is_empty()).then(|| request.log_path.into());
     config.scratch_directory =
         (!request.scratch_directory.trim().is_empty()).then(|| request.scratch_directory.into());
     config.port = request.port;
@@ -148,6 +149,12 @@ fn build_config(request: LlamafileLoadRequest) -> LlamafileConfig {
             .unwrap_or(DEFAULT_REQUEST_TIMEOUT_MS),
     );
     config
+}
+
+fn same_session_config(existing: &LlamafileConfig, requested: &LlamafileConfig) -> bool {
+    let mut requested = requested.clone();
+    requested.log_path.clone_from(&existing.log_path);
+    existing == &requested
 }
 
 fn session_key(session_id: &str) -> String {
@@ -201,6 +208,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn session_config_ignores_log_path_changes() {
+        let mut existing = LlamafileConfig::new("llamafile", "model", "mmproj");
+        existing.log_path = Some("logs/2026-07-26.log".into());
+        let mut requested = existing.clone();
+        requested.log_path = Some("logs/2026-07-27.log".into());
+
+        assert!(same_session_config(&existing, &requested));
+        requested.model_path = "other-model".into();
+        assert!(!same_session_config(&existing, &requested));
+    }
+
+    #[test]
     fn rejects_missing_llamafile_before_creating_session() {
         let sessions = SessionManager::default();
         let error = load(
@@ -209,6 +228,7 @@ mod tests {
                 llamafile_path: "missing.exe".to_string(),
                 model_path: "missing.gguf".to_string(),
                 mmproj_path: "missing-mmproj.gguf".to_string(),
+                log_path: String::new(),
                 scratch_directory: String::new(),
                 port: 0,
                 context_size: None,
