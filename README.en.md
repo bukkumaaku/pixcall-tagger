@@ -24,7 +24,7 @@ Current version: `2.2.1`
 - Can generate tags or write a description to Pixcall.
 - Tag and description prompts can be edited, saved independently, and restored to defaults.
 - Supports skip, overwrite, and merge modes for existing tags or descriptions.
-- Built-in local models include Qwen3.5-9B, Qwen3-VL 8B, and Llama JoyCaption Alpha Two 8B.
+- Built-in local models include Qwen3.5-9B, Qwen3-VL 8B, Llama JoyCaption Alpha Two 8B, and Llama JoyCaption Beta One 8B.
 - llamafile stdout and stderr are written by date to `model-root/logs/YYYY-MM-DD.log`.
 - Local LLM startup can auto-detect CUDA, Metal, and Vulkan, report unavailable backends clearly, and optionally fall back to Vulkan or CPU.
 
@@ -131,6 +131,7 @@ The built-in download list currently includes:
 - `Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q4_K_M`
 - `Qwen3VL-8B-Instruct-Q4_K_M`
 - `Llama-JoyCaption-Alpha-Two-8B-Q6_K`
+- `Llama-JoyCaption-Beta-One-8B-Q4_K_M`
 
 Each model belongs under `model-root/llm/model-name/` and requires a GGUF main model plus its corresponding `mmproj` file. Place the platform-specific llamafile runner under `model-root/llamafile/`.
 
