@@ -2,6 +2,8 @@
 
 English | [简体中文](./README.md)
 
+> **Compatibility notice:** Qwen 3.5 family models currently cannot run with the Vulkan backend due to an upstream llamafile/llama.cpp compatibility issue. Use CUDA, Metal (macOS), or CPU instead.
+
 Pixcall AI Tagger is a built-in Pixcall plugin with a Vue frontend and a Rust `ai-worker`. It generates tags and descriptions for images and videos, provides one-click workflows, and combines semantic search over images, tags, and descriptions.
 
 Current version: `2.2.2`

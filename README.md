@@ -2,6 +2,8 @@
 
 [English](./README.en.md) | 简体中文
 
+> **兼容性提示：** 当前 Qwen 3.5 系列模型无法使用 Vulkan 后端运行，这是 llamafile/llama.cpp 的上游兼容性问题。请改用 CUDA、Metal（macOS）或 CPU 后端。
+
 Pixcall AI Tagger 是一个面向 Pixcall 的内置插件，使用 Vue 前端和 Rust `ai-worker`，为图片和视频生成标签与描述，提供一键处理，以及图片、标签和描述的混合语义搜索。
 
 当前版本：`2.2.2`
