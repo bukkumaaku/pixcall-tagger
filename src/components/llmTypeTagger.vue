@@ -62,6 +62,7 @@ import {
     listTaggerBackupsInDirectory,
     restoreTaggerBackup,
     scopedTaggerBackupDirectory,
+    taggerBackupOperationKey,
     type TaggerBackupCategory,
     type TaggerBackupOption,
     } from "../services/taggerBackup";
@@ -132,6 +133,16 @@ import {
     let loadedModel = "";
     let saveTimer: ReturnType<typeof setTimeout> | undefined;
     const backups = ref<TaggerBackupOption[]>([]);
+    const backupOptions = computed(() =>
+        backups.value.map((backup) => ({
+            label: t.value("backup.option_label", {
+                createdAt: backup.createdAt,
+                operation: t.value(taggerBackupOperationKey(backup.operation)),
+                count: backup.itemCount,
+            }),
+            value: backup.value,
+        })),
+    );
     const selectedBackup = ref("");
     const isRestoring = ref(false);
     const llmProfiles = ref<RemoteLlmProfile[]>([]);
@@ -1093,7 +1104,7 @@ import {
                 <FormHelp :content="promptMode === 'annotation' ? t('backup.annotation_description') : t('backup.tag_description')" />
                 <n-select
                     v-model:value="selectedBackup"
-                    :options="backups"
+                    :options="backupOptions"
                     clearable
                     :placeholder="
                         promptMode === 'annotation'

@@ -20,6 +20,7 @@
         onBeforeUnmount,
         onDeactivated,
         onMounted,
+        computed,
         ref,
         watch,
         type Ref,
@@ -40,6 +41,7 @@ import {
     listTaggerBackupsInDirectory,
     restoreTaggerBackup,
     scopedTaggerBackupDirectory,
+    taggerBackupOperationKey,
     type TaggerBackupOption,
 } from "../services/taggerBackup";
     import {
@@ -311,6 +313,16 @@ import {
     });
     const showModal = ref(false);
     const backups = ref<TaggerBackupOption[]>([]);
+    const backupOptions = computed(() =>
+        backups.value.map((backup) => ({
+            label: t.value("backup.option_label", {
+                createdAt: backup.createdAt,
+                operation: t.value(taggerBackupOperationKey(backup.operation)),
+                count: backup.itemCount,
+            }),
+            value: backup.value,
+        })),
+    );
     const selectedBackup = ref("");
     const isRestoring = ref(false);
 
@@ -487,7 +499,7 @@ import {
             <FormHelp :content="t('backup.tag_description')" />
             <n-select
                 v-model:value="selectedBackup"
-                :options="backups"
+                :options="backupOptions"
                 clearable
                 :placeholder="t('backup.select_tag')"
                 :disabled="isTagging || isRestoring || backups.length === 0"

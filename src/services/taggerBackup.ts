@@ -21,10 +21,10 @@ export type TaggerBackupSource = "eagle" | "pixcall";
 export type TaggerBackupCategory = "tags" | "annotations";
 
 export type TaggerBackupOption = {
-    label: string;
     value: string;
     createdAt: string;
     itemCount: number;
+    operation: TaggerBackup["operation"];
 };
 
 export const scopedTaggerBackupDirectory = (
@@ -40,10 +40,10 @@ export const scopedTaggerBackupDirectory = (
 const safeOperationName = (operation: TaggerBackup["operation"]) =>
     operation.replace(/[^a-z0-9-]/gi, "-");
 
-const operationLabel = (operation: TaggerBackup["operation"]) => ({
-    wd: translate("backup.operation_wd"),
-    "llm-tag": translate("backup.operation_llm_tag"),
-    "llm-annotation": translate("backup.operation_llm_annotation"),
+export const taggerBackupOperationKey = (operation: TaggerBackup["operation"]) => ({
+    wd: "backup.operation_wd",
+    "llm-tag": "backup.operation_llm_tag",
+    "llm-annotation": "backup.operation_llm_annotation",
 })[operation];
 
 export async function createTaggerBackupInDirectory(
@@ -92,14 +92,10 @@ export async function listTaggerBackupsInDirectory(
                     (backup.operation === "llm-annotation" ? "annotations" : "tags");
                 if (expectedCategory && category !== expectedCategory) return null;
                 return {
-                    label: translate("backup.option_label", {
-                        createdAt: backup.createdAt,
-                        operation: operationLabel(backup.operation),
-                        count: backup.items.length,
-                    }),
                     value: entry.path,
                     createdAt: backup.createdAt,
                     itemCount: backup.items.length,
+                    operation: backup.operation,
                 } satisfies TaggerBackupOption;
             } catch {
                 return null;
