@@ -7,6 +7,7 @@ import type {
 import { config } from "../api/backen";
 import { getBackendClient } from "./backendClient";
 import { joinPath } from "./pathUtils";
+import { translate } from "./i18n";
 
 const SESSION_ID = "embedding-main";
 const INDEX_FILENAME = "pixcall-semantic-index.sqlite3";
@@ -107,7 +108,7 @@ async function resolveSemanticIndexStatusTarget(): Promise<SemanticIndexStatusTa
         : config.embeddingModelName && config.endpoint
           ? [{
                 id: "legacy",
-                name: "远程接口",
+                name: translate("settings.remote_embedding"),
                 provider: config.embeddingProvider === "gemini" ? "gemini" : "open_ai",
                 endpoint: config.endpoint,
                 apiKey: config.apiKey,
@@ -174,5 +175,5 @@ async function resolveLibraryNamespace(): Promise<string> {
     for (const candidate of candidates) {
         if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
     }
-    throw new Error("无法读取 Pixcall 当前图库标识");
+    throw new Error(translate("semantic_search.library_path_failed", { detail: "" }));
 }

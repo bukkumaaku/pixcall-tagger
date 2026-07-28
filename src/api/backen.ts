@@ -14,7 +14,7 @@ import {
     waitForTaskControl,
 } from "../services/taskCenter";
 import { resolveResourcePath } from "../services/pathUtils";
-import { translate } from "../services/i18n";
+import { translate, type TranslationParams } from "../services/i18n";
 
 let error_image: string[] = [];
 
@@ -45,7 +45,9 @@ export let config = {} as Config;
 export const configRevision = ref(0);
 export const configLoaded = ref(false);
 export const completeItem = ref(0);
-export const t = ref((key: string) => translate(key));
+export const t = ref((key: string, params?: TranslationParams) =>
+    translate(key, params),
+);
 export const convertPath = resolveResourcePath;
 let configWriteQueue: Promise<void> = Promise.resolve();
 
@@ -156,7 +158,7 @@ export const backenAPI = {
                 itemId: item.id,
                 name: item.name || item.id,
                 path: item.filePath || item.thumbnailPath || "",
-                error: "不支持的文件类型",
+                error: t.value("common.unsupported_file_type"),
             });
         }
 
@@ -236,7 +238,7 @@ export const backenAPI = {
             recordFailure({
                 taskId: activeTask.value?.id || "",
                 kind: "wd",
-                name: "WD 打标任务",
+                name: t.value("index.task_title"),
                 path: "",
                 error: error instanceof Error ? error.message : String(error),
             });
@@ -259,7 +261,10 @@ export const backenAPI = {
         );
         if (!model) {
             throw new Error(
-                `没有在 ${result.modelsDirectory} 找到模型 ${config.modelPath}`,
+                t.value("index.model_not_found", {
+                    directory: result.modelsDirectory,
+                    model: config.modelPath,
+                }),
             );
         }
         return {
@@ -377,7 +382,7 @@ export const backenAPI = {
     async saveLlamafileRunnerPath(runnerPath: string) {
         const pathInfo = await getBackendClient().pathInfo(runnerPath);
         if (!pathInfo.isFile) {
-            throw new Error("没有找到 llamafile runner");
+            throw new Error(t.value("llm_tagger.runner_not_found"));
         }
         await this.getConfig();
         config.llmRunnerPath = runnerPath;

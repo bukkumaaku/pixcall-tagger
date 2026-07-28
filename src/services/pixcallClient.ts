@@ -1,6 +1,7 @@
 import { getPixcallContext, pixcallCommand, pixcallRequest } from "./pixcallBridge";
 import { getBackendClient } from "./backendClient";
 import { joinPath } from "./pathUtils";
+import { translate } from "./i18n";
 
 export type PixcallEntry = {
     id: string;
@@ -58,7 +59,9 @@ class PixcallClient {
         try {
             return await pixcallRequest<T>(payload);
         } catch (error) {
-            throw new Error(`无法连接 Pixcall，请确认 Pixcall 正在运行：${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(translate("pixcall.connection_failed", {
+                error: error instanceof Error ? error.message : String(error),
+            }));
         }
     }
 
@@ -120,7 +123,7 @@ class PixcallClient {
         const returnedIds = new Set(items.map((item) => item.id));
         const missingIds = itemIds.filter((id) => !returnedIds.has(id));
         if (missingIds.length > 0) {
-            throw new Error(`Pixcall 未返回 ${missingIds.length} 个图库条目，已取消索引清理`);
+            throw new Error(translate("pixcall.snapshot_missing_items", { count: missingIds.length }));
         }
         return { items, itemIds };
     }
@@ -164,7 +167,7 @@ class PixcallClient {
         if (cached) return this.hydrateEntry(cached);
         const items = await this.getItems([normalizedId]);
         const item = items[0];
-        if (!item) throw new Error(`Pixcall 中找不到条目 ${id}`);
+        if (!item) throw new Error(translate("pixcall.item_not_found", { id }));
         return item;
     }
 
@@ -238,7 +241,7 @@ class PixcallClient {
                 if (typeof record[key] === "string") return record[key] as string;
             }
         }
-        throw new Error(`Pixcall 未返回条目 ${entry.name || entry.id} 的本地文件路径`);
+        throw new Error(translate("pixcall.item_path_missing", { name: entry.name || entry.id }));
     }
 
     private async ensureTags() {
@@ -330,7 +333,7 @@ export function installPixcallHost() {
         dialog: {
             showOpenDialog: async (options: { properties?: string[] }) => {
                 if (!window.pixcall?.showOpenDialog) {
-                    throw new Error("当前 Pixcall 版本未提供目录选择器");
+                    throw new Error(translate("pixcall.directory_picker_unavailable"));
                 }
                 return window.pixcall.showOpenDialog(options);
             },
@@ -344,7 +347,7 @@ export function installPixcallHost() {
                 getPaths: async () => {
                     const tools = await getBackendClient().systemTools();
                     if (!tools.ffmpegPath || !tools.ffprobePath) {
-                        throw new Error("PATH 中未找到 ffmpeg 或 ffprobe");
+                        throw new Error(translate("pixcall.ffmpeg_not_found"));
                     }
                     return { ffmpeg: tools.ffmpegPath, ffprobe: tools.ffprobePath };
                 },

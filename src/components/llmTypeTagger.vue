@@ -222,7 +222,7 @@ import {
         await backenAPI.getConfig();
         const configuredModel = config.llmModelPath;
         llmProfiles.value = (config.llmRemoteProfiles || []).map((profile) => ({ ...profile }));
-        if (llmProfiles.value.length === 0 && config.llmEndpoint && config.llmRemoteModel) llmProfiles.value.push({ id: "legacy", name: "远程 LLM", provider: config.llmProvider === "gemini" ? "gemini" : "open_ai", endpoint: config.llmEndpoint, apiKey: config.llmApiKey, model: config.llmRemoteModel });
+        if (llmProfiles.value.length === 0 && config.llmEndpoint && config.llmRemoteModel) llmProfiles.value.push({ id: "legacy", name: t.value("settings.remote_llm_legacy"), provider: config.llmProvider === "gemini" ? "gemini" : "open_ai", endpoint: config.llmEndpoint, apiKey: config.llmApiKey, model: config.llmRemoteModel });
         const activeProfile = llmProfiles.value.find((profile) => profile.id === config.llmRemoteProfileId) || llmProfiles.value[0];
         const useRemoteProfile = config.llmProvider !== "local" && activeProfile;
         promptMode.value = normalizePromptMode(
@@ -361,7 +361,7 @@ import {
             (item) => !item.runnerOnly && item.value === formData.value.model,
         );
         if (!model) {
-            throw new Error(`没有找到模型配置：${formData.value.model}`);
+            throw new Error(t.value("llm_tagger.model_config_missing", { model: formData.value.model }));
         }
 
         const files = await Promise.all(
@@ -382,7 +382,7 @@ import {
             : "";
 
         if (!modelFile || !mmprojFile) {
-            throw new Error(`模型 ${model.label} 的文件配置不完整`);
+            throw new Error(t.value("llm_tagger.model_files_incomplete", { model: model.label }));
         }
 
         return {
@@ -420,7 +420,7 @@ import {
                 (id) => eagle.item.getById(id),
                 TAGGER_BACKUP_SOURCE,
             );
-            notification(`已恢复 ${result.restored} 项，跳过 ${result.skipped} 项`, "success");
+            notification(t.value("backup.restored_summary", result), "success");
         } catch (error) {
             notification(error instanceof Error ? error.message : String(error), "error");
         } finally {
@@ -517,7 +517,7 @@ import {
             }
             if ((await backend.pathInfo(candidate)).isFile) return candidate;
         }
-        throw new Error("没有可读取的 PNG、JPEG、WebP 或 BMP 图片");
+        throw new Error(t.value("llm_tagger.no_readable_image"));
     };
 
     const normalizeModelContent = (content: string) =>
@@ -546,7 +546,7 @@ import {
         if (mode === "tag") {
             const generatedTags = parseTags(content);
             if (generatedTags.length === 0) {
-                throw new Error("模型没有返回可用标签");
+                throw new Error(t.value("llm_tagger.no_tags_returned"));
             }
             if (
                 formData.value.overwrite === "nocover" &&
@@ -562,7 +562,7 @@ import {
                       );
         } else {
             const annotation = normalizeModelContent(content);
-            if (!annotation) throw new Error("模型没有返回可用注释");
+            if (!annotation) throw new Error(t.value("llm_tagger.no_annotation_returned"));
             if (formData.value.annotationOverwrite === "nocover" && String(item.annotation || "").trim()) return;
             item.annotation = annotation;
         }
@@ -577,7 +577,7 @@ import {
     };
 
     const processVideoItem = async (backend: BackendClient, item: any, mode: PromptMode, instruction: string, taskId: string) => {
-        if (!item.filePath) throw new Error("视频没有可读取的文件路径");
+        if (!item.filePath) throw new Error(t.value("llm_tagger.video_path_missing"));
         const ffmpeg = await eagle.extraModule.ffmpeg.getPaths();
         const extracted = await backend.extractVideoFrames(item.filePath, ffmpeg.ffmpeg, ffmpeg.ffprobe);
         try {
@@ -586,7 +586,7 @@ import {
                 frameResults = [];
                 for (const [index, framePath] of extracted.framePaths.entries()) {
                     await waitForTaskControl(taskId);
-                    updateTask(taskId, { detail: `视频 ${item.name || item.id}：分析帧 ${index + 1}/${extracted.framePaths.length}` });
+                    updateTask(taskId, { detail: t.value("llm_tagger.video_frame_progress", { name: item.name || item.id, current: index + 1, total: extracted.framePaths.length }) });
                     frameResults.push(await processFrame(backend, framePath, instruction));
                 }
             } else {
@@ -612,20 +612,20 @@ import {
                 }, (result) => {
                     if (!resultById.has(result.itemId)) returned++;
                     resultById.set(result.itemId, result);
-                    updateTask(taskId, { detail: `视频 ${item.name || item.id}：并发 ${concurrency}，帧 ${returned}/${extracted.framePaths.length}` });
+                    updateTask(taskId, { detail: t.value("llm_tagger.video_concurrency_progress", { name: item.name || item.id, concurrency, current: returned, total: extracted.framePaths.length }) });
                 });
                 batch.results.forEach((result) => resultById.set(result.itemId, result));
                 frameResults = extracted.framePaths.map((_, index) => {
                     const result = resultById.get(`${item.id}:frame:${index}`);
-                    if (!result) throw new Error(`视频第 ${index + 1} 帧没有返回结果`);
-                    if (result.error) throw new Error(`视频第 ${index + 1} 帧：${result.error}`);
+                    if (!result) throw new Error(t.value("llm_tagger.video_frame_no_result", { frame: index + 1 }));
+                    if (result.error) throw new Error(t.value("llm_tagger.video_frame_error", { frame: index + 1, error: result.error }));
                     return result.content;
                 });
             }
             if (mode === "tag") { await writeResult(item.id, mode, frameResults.join("\n")); return; }
             const percentages = [1, 20, 40, 60, 80, 99];
             const observations = frameResults.map((content, index) => `${percentages[index]}%：${normalizeModelContent(content)}`).join("\n");
-            const summaryPrompt = `以下是同一视频六个时间点的画面注释：\n${observations}\n请综合这些按时间排列的画面，解释视频讲了什么、发生了什么以及包含哪些重要内容。只输出一段完整、准确的视频注释，不要逐帧复述。`;
+            const summaryPrompt = t.value("llm_tagger.video_summary_prompt", { observations });
             await waitForTaskControl(taskId);
             await writeResult(item.id, mode, await processFrame(backend, extracted.framePaths[0], summaryPrompt));
         } finally {
@@ -669,13 +669,13 @@ import {
 
         const backend = getBackendClient();
         try {
-            if (formData.value.llmProvider !== "local" && (!formData.value.llmEndpoint.trim() || !formData.value.llmRemoteModel.trim())) throw new Error("远程 LLM endpoint 和 model 不能为空");
+            if (formData.value.llmProvider !== "local" && (!formData.value.llmEndpoint.trim() || !formData.value.llmRemoteModel.trim())) throw new Error(t.value("llm_tagger.remote_config_required"));
             const runtimePaths = formData.value.llmProvider === "local" ? await resolveRuntimePaths() : null;
             if (runtimePaths) {
             const runnerInfo = await backend.pathInfo(runtimePaths.llamafilePath);
             if (!runnerInfo.isFile) {
                 promptRunnerDownload();
-                if (throwOnFailure) throw new Error("LLM 运行器尚未安装");
+                if (throwOnFailure) throw new Error(t.value("llm_tagger.runner_not_installed"));
                 return;
             }
             }
@@ -710,11 +710,11 @@ import {
         let cancellationError: unknown;
         const taskId = beginTask(
             "llm",
-            mode === "tag" ? "LLM 图片打标" : "LLM 写入注释",
+            mode === "tag" ? t.value("llm_tagger.task_tag_title") : t.value("llm_tagger.task_annotation_title"),
             items.length,
         );
         if (!taskId) {
-            if (throwOnFailure) throw new Error("无法启动 LLM 任务");
+            if (throwOnFailure) throw new Error(t.value("llm_tagger.task_start_failed"));
             return;
         }
         isProcessing.value = true;
@@ -727,13 +727,13 @@ import {
             await nextTick();
             backend.start();
             processingStage.value = "loading_model";
-            updateTask(taskId, { detail: "正在加载模型" });
+            updateTask(taskId, { detail: t.value("common.loading_model") });
             await nextTick();
             if (formData.value.llmProvider === "local") await ensureSession(backend);
             processingStage.value =
                 mode === "tag" ? "tagging" : "annotating";
             updateTask(taskId, {
-                detail: mode === "tag" ? "正在打标" : "正在写入注释",
+                detail: mode === "tag" ? t.value("llm_tagger.stage_tagging") : t.value("llm_tagger.stage_annotating"),
             });
             const finishItem = () => {
                 completedItems.value++;
@@ -835,7 +835,7 @@ import {
                                 error: result.error,
                             });
                             updateTask(taskId, {
-                                detail: `远程并发 ${Math.min(concurrency, pending.length)}：本批返回 ${returned}/${pending.length}`,
+                                detail: t.value("llm_tagger.remote_batch_progress", { concurrency: Math.min(concurrency, pending.length), returned, total: pending.length }),
                             });
                             if (
                                 result.error ||
@@ -898,7 +898,7 @@ import {
                             try {
                                 if (!result) {
                                     throw lastErrors.get(entry.item.id) ||
-                                        new Error("远程 LLM 未返回该图片的结果");
+                                        new Error(t.value("llm_tagger.remote_no_result"));
                                 }
                                 if (result.error) throw new Error(result.error);
                                 const writeError = writeErrors.get(entry.item.id);
@@ -921,7 +921,7 @@ import {
                                 } else {
                                     failItem(
                                         entry.item,
-                                        new Error(`${retryError.message}（已重试 2 次）`),
+                                        new Error(t.value("llm_tagger.retry_exhausted", { error: retryError.message })),
                                     );
                                     finishItem();
                                 }
@@ -930,7 +930,7 @@ import {
                         pending = retryItems;
                         if (pending.length > 0) {
                             updateTask(taskId, {
-                                detail: `远程请求失败 ${pending.length} 项，准备第 ${attempt + 1} 次尝试`,
+                                detail: t.value("llm_tagger.remote_retry", { count: pending.length, attempt: attempt + 1 }),
                             });
                             await new Promise((resolve) =>
                                 setTimeout(resolve, 500 * attempt),
@@ -944,7 +944,7 @@ import {
                 wasCancelled = true;
                 cancellationError = error;
                 cancelTask(taskId);
-                notification("LLM 任务已取消", "warning");
+                notification(t.value("llm_tagger.task_cancelled"), "warning");
             }
             if (!wasCancelled) {
                 const message = error instanceof Error ? error.message : String(error);
@@ -952,7 +952,7 @@ import {
                 recordFailure({
                     taskId,
                     kind: "llm",
-                    name: "LLM 任务",
+                    name: t.value("llm_tagger.task_name"),
                     path: "",
                     error: message,
                 });
@@ -968,7 +968,7 @@ import {
             } else {
                 completeTask(
                     taskId,
-                    mode === "tag" ? "打标完成" : "注释完成",
+                    mode === "tag" ? t.value("llm_tagger.task_tag_completed") : t.value("llm_tagger.task_annotation_completed"),
                 );
             }
         }
@@ -1047,7 +1047,7 @@ import {
 
             <n-form-item
                 v-if="formData.llmProvider !== 'local'"
-                label="并发"
+                :label="t('llm_tagger.concurrency')"
                 path="remoteConcurrency"
             >
                 <n-input-number
@@ -1088,16 +1088,17 @@ import {
             </n-form-item>
 
             <n-form-item
-                :label="promptMode === 'annotation' ? '注释备份' : '标签备份'"
+                :label="promptMode === 'annotation' ? t('backup.annotation_title') : t('backup.tag_title')"
             >
+                <FormHelp :content="promptMode === 'annotation' ? t('backup.annotation_description') : t('backup.tag_description')" />
                 <n-select
                     v-model:value="selectedBackup"
                     :options="backups"
                     clearable
                     :placeholder="
                         promptMode === 'annotation'
-                            ? '选择要恢复的注释备份'
-                            : '选择要恢复的标签备份'
+                            ? t('backup.select_annotation')
+                            : t('backup.select_tag')
                     "
                     :disabled="isProcessing || isRestoring || backups.length === 0"
                 />
@@ -1107,7 +1108,7 @@ import {
                     :disabled="!selectedBackup || isProcessing"
                     @click="restoreSelectedBackup"
                 >
-                    {{ promptMode === "annotation" ? "恢复注释" : "恢复标签" }}
+                    {{ promptMode === "annotation" ? t("backup.restore_annotation") : t("backup.restore_tag") }}
                 </n-button>
             </n-form-item>
 

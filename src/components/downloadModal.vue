@@ -152,17 +152,20 @@
             dialog.error({
                 title: t.value("model_download_window.download_failed"),
                 content: error instanceof Error ? error.message : String(error),
-                positiveText: "OK",
+                positiveText: t.value("common.ok"),
             });
             return;
         }
-        const taskId = beginTask("download", "模型下载");
+        const taskId = beginTask(
+            "download",
+            t.value("model_download_window.task_title"),
+        );
         if (!taskId) {
             isDownloading.value = false;
             dialog.warning({
-                title: "任务正在运行",
-                content: "请等待当前任务完成后再下载。",
-                positiveText: "OK",
+                title: t.value("common.task_running_title"),
+                content: t.value("common.task_running_download"),
+                positiveText: t.value("common.ok"),
             });
             return;
         }
@@ -201,7 +204,10 @@
                         item.downloadedBytes = progress.downloadedBytes;
                         item.totalBytes = progress.totalBytes ?? 0;
                         updateTask(taskId, {
-                            detail: `正在下载 ${item.filename}`,
+                            detail: t.value(
+                                "model_download_window.downloading_file",
+                                { filename: item.filename },
+                            ),
                             completed: downloadedBytes(),
                             total: totalBytes(),
                         });
@@ -240,11 +246,17 @@
                 content:
                     errors ||
                     t.value("model_download_window.download_failed_notice"),
-                positiveText: "OK",
+                positiveText: t.value("common.ok"),
             });
-            failTask(taskId, errors || "部分文件下载失败");
+            failTask(
+                taskId,
+                errors || t.value("model_download_window.partial_failed"),
+            );
         } else {
-            completeTask(taskId, "下载完成");
+            completeTask(
+                taskId,
+                t.value("model_download_window.task_completed"),
+            );
             await finishDownload(
                 downloadItems.value.map((item) => item.dest),
             );
@@ -261,7 +273,7 @@
         dialog.success({
             title: t.value("model_download_window.all_done"),
             content: t.value("model_download_window.all_done_notice"),
-            positiveText: "OK",
+            positiveText: t.value("common.ok"),
             onPositiveClick: finish,
             onClose: finish,
             onMaskClick: finish,
@@ -355,7 +367,7 @@
                 :show="isDownloading || downloadItems.length > 0"
             >
                 <n-card
-                    title="下载进度"
+                    :title="t('model_download_window.progress')"
                     embedded
                     :bordered="false"
                     size="small"

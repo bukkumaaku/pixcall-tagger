@@ -16,7 +16,7 @@
         SyncOutline,
     } from "@vicons/ionicons5";
     import { computed, ref } from "vue";
-    import { backenAPI, config, notification } from "../api/backen";
+    import { backenAPI, config, notification, t } from "../api/backen";
     import {
         createTaggerBackupInDirectory,
         scopedTaggerBackupDirectory,
@@ -44,11 +44,11 @@
     const TAGGER_BACKUP_SOURCE = "pixcall" as const;
 
     const stageDefinitions: Array<{ key: StageKey; label: string }> = [
-        { key: "tagging", label: "图片打标" },
-        { key: "annotation", label: "生成注释" },
-        { key: "imageEmbedding", label: "图片向量化" },
-        { key: "tagEmbedding", label: "标签向量化" },
-        { key: "annotationEmbedding", label: "注释向量化" },
+        { key: "tagging", label: t.value("workflow.stage_tagging") },
+        { key: "annotation", label: t.value("workflow.stage_annotation") },
+        { key: "imageEmbedding", label: t.value("workflow.stage_image_embedding") },
+        { key: "tagEmbedding", label: t.value("workflow.stage_tag_embedding") },
+        { key: "annotationEmbedding", label: t.value("workflow.stage_annotation_embedding") },
     ];
     const taggerMode = ref<TaggerMode>("wd");
     const isRunning = ref(false);
@@ -64,7 +64,12 @@
     function createInitialStages(): Record<StageKey, StageStatus> {
         return { tagging: "pending", annotation: "pending", imageEmbedding: "pending", tagEmbedding: "pending", annotationEmbedding: "pending" };
     }
-    function stageLabel(status: StageStatus) { return { pending: "等待", running: "处理中", done: "完成", failed: "失败" }[status]; }
+    function stageLabel(status: StageStatus) { return {
+        pending: t.value("workflow.status_pending"),
+        running: t.value("workflow.status_running"),
+        done: t.value("workflow.status_done"),
+        failed: t.value("workflow.status_failed"),
+    }[status]; }
     function stageTagType(status: StageStatus) {
         if (status === "done") return "success" as const;
         if (status === "failed") return "error" as const;
@@ -83,7 +88,7 @@
             if (wdRef.value?.ready && llmRef.value?.ready && semanticRef.value?.ready) return;
             await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        throw new Error("处理模块初始化超时，请检查模型和远程接口配置");
+        throw new Error(t.value("workflow.engine_timeout"));
     }
     async function runStage(key: StageKey, action: () => Promise<void>) {
         stages.value[key] = "running";
@@ -93,7 +98,9 @@
     async function refreshItems(snapshot: WorkflowItem[]) {
         return Promise.all(snapshot.map(async (snapshotItem) => {
             const item = await eagle.item.getById(snapshotItem.id);
-            if (!item) throw new Error(`无法重新读取图片 ${snapshotItem.name || snapshotItem.id}`);
+            if (!item) throw new Error(t.value("workflow.refresh_failed", {
+                name: snapshotItem.name || snapshotItem.id,
+            }));
             return item as WorkflowItem;
         }));
     }
@@ -114,9 +121,9 @@
         );
     }
     async function startWorkflow() {
-        if (isRunning.value || backenAPI.is_processing) { notification("仍有任务正在进行中，请等待", "warning"); return; }
+        if (isRunning.value || backenAPI.is_processing) { notification(t.value("workflow.task_running"), "warning"); return; }
         const snapshot = (await eagle.item.getSelected()) as WorkflowItem[];
-        if (snapshot.length === 0) { notification("请先选择要处理的图片", "warning"); return; }
+        if (snapshot.length === 0) { notification(t.value("workflow.select_images"), "warning"); return; }
         selectedCount.value = snapshot.length;
         stages.value = createInitialStages();
         errorText.value = "";
@@ -142,7 +149,7 @@
             await runStage("imageEmbedding", () => semanticRef.value!.runImageIndexing(refreshedItems));
             await runStage("tagEmbedding", () => semanticRef.value!.runTagIndexing(refreshedItems));
             await runStage("annotationEmbedding", () => semanticRef.value!.runAnnotationIndexing(refreshedItems));
-            notification(`已完成 ${snapshot.length} 张图片的一键处理`, "success");
+            notification(t.value("workflow.completed", { count: snapshot.length }), "success");
         } catch (error) {
             errorText.value = error instanceof Error ? error.message : String(error);
             notification(errorText.value, "error");
@@ -153,10 +160,10 @@
 <template>
     <main class="workflow-page">
         <header class="workflow-header">
-            <div><h1>一键处理</h1><span v-if="selectedCount > 0" class="selection-count">本次固定 {{ selectedCount }} 张图片</span></div>
+            <div><h1>{{ t("workflow.title") }}</h1><span v-if="selectedCount > 0" class="selection-count">{{ t("workflow.selection_count", { count: selectedCount }) }}</span></div>
             <n-radio-group v-model:value="taggerMode" :disabled="isRunning">
-                <n-radio-button value="wd">WD 打标</n-radio-button>
-                <n-radio-button value="llm">LLM 打标</n-radio-button>
+                <n-radio-button value="wd">{{ t("workflow.wd_mode") }}</n-radio-button>
+                <n-radio-button value="llm">{{ t("workflow.llm_mode") }}</n-radio-button>
             </n-radio-group>
         </header>
         <section class="workflow-panel">
@@ -172,11 +179,11 @@
                     <n-tag size="small" :type="stageTagType(stages[stage.key])">{{ stageLabel(stages[stage.key]) }}</n-tag>
                 </li>
             </ol>
-            <n-alert v-if="errorText" type="error" title="流程已停止">{{ errorText }}</n-alert>
+            <n-alert v-if="errorText" type="error" :title="t('workflow.stopped')">{{ errorText }}</n-alert>
             <div class="workflow-actions">
                 <n-button type="primary" size="large" :loading="isRunning" :disabled="isRunning" @click="startWorkflow">
                     <template #icon><n-icon :component="FlashOutline" /></template>
-                    开始处理选中图片
+                    {{ t("workflow.start") }}
                 </n-button>
             </div>
         </section>

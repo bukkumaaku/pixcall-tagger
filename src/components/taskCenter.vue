@@ -13,6 +13,7 @@
     } from "naive-ui";
     import { CloseOutline, EyeOutline, ListOutline, PauseOutline, PlayOutline, TrashOutline } from "@vicons/ionicons5";
     import { computed, ref } from "vue";
+    import { t } from "../api/backen";
     import {
         activeTask,
         clearFailure,
@@ -43,19 +44,19 @@
                 : "info";
     const statusText = (task: TaskRecord) =>
         ({
-            running: "运行中",
-            paused: "已暂停",
-            completed: "已完成",
-            failed: "失败",
-            cancelled: "已取消",
+            running: t.value("task_center.status_running"),
+            paused: t.value("task_center.status_paused"),
+            completed: t.value("task_center.status_completed"),
+            failed: t.value("task_center.status_failed"),
+            cancelled: t.value("task_center.status_cancelled"),
         })[task.status];
     const kindText = (kind: TaskRecord["kind"]) =>
         ({
-            wd: "WD 打标",
-            llm: "LLM",
-            embedding: "向量索引",
-            search: "语义搜索",
-            download: "下载",
+            wd: t.value("task_center.kind_wd"),
+            llm: t.value("task_center.kind_llm"),
+            embedding: t.value("task_center.kind_embedding"),
+            search: t.value("task_center.kind_search"),
+            download: t.value("task_center.kind_download"),
         })[kind];
     const activePercentage = computed(() =>
         activeTask.value ? percentage(activeTask.value) : 0,
@@ -72,7 +73,7 @@
             :dot="failureRecords.length === 0 && Boolean(activeTask)"
             processing
         >
-            <n-button circle secondary title="任务中心" @click="visible = true">
+            <n-button circle secondary :title="t('task_center.title')" @click="visible = true">
                 <template #icon><n-icon><ListOutline /></n-icon></template>
             </n-button>
         </n-badge>
@@ -94,9 +95,9 @@
         placement="right"
         :drawer-style="{ top: '30px', height: 'calc(100% - 30px)' }"
     >
-        <n-drawer-content title="任务中心" closable>
+        <n-drawer-content :title="t('task_center.title')" closable>
             <n-tabs type="line" animated>
-                <n-tab-pane name="tasks" tab="任务">
+                <n-tab-pane name="tasks" :tab="t('task_center.tasks')">
                     <div class="task-toolbar">
                         <n-button
                             quaternary
@@ -104,10 +105,10 @@
                             @click="clearFinishedTasks"
                         >
                             <template #icon><n-icon><TrashOutline /></n-icon></template>
-                            清理已完成
+                            {{ t("task_center.clear_finished") }}
                         </n-button>
                     </div>
-                    <n-empty v-if="taskHistory.length === 0" description="暂无任务" />
+                    <n-empty v-if="taskHistory.length === 0" :description="t('task_center.empty_tasks')" />
                     <div v-else class="task-list">
                         <article v-for="task in taskHistory" :key="task.id" class="task-item">
                     <div class="task-header">
@@ -132,26 +133,26 @@
                         {{ task.completed }}/{{ task.total }}
                     </div>
                     <div v-if="task.controllable && (task.status === 'running' || task.status === 'paused')" class="task-actions">
-                        <n-button v-if="task.status === 'running'" size="small" secondary @click="pauseTask(task.id)"><template #icon><n-icon><PauseOutline /></n-icon></template>暂停</n-button>
-                        <n-button v-else size="small" secondary type="warning" @click="resumeTask(task.id)"><template #icon><n-icon><PlayOutline /></n-icon></template>继续</n-button>
-                        <n-button size="small" secondary type="error" @click="requestTaskCancel(task.id)"><template #icon><n-icon><CloseOutline /></n-icon></template>取消</n-button>
+                        <n-button v-if="task.status === 'running'" size="small" secondary @click="pauseTask(task.id)"><template #icon><n-icon><PauseOutline /></n-icon></template>{{ t("common.pause") }}</n-button>
+                        <n-button v-else size="small" secondary type="warning" @click="resumeTask(task.id)"><template #icon><n-icon><PlayOutline /></n-icon></template>{{ t("common.resume") }}</n-button>
+                        <n-button size="small" secondary type="error" @click="requestTaskCancel(task.id)"><template #icon><n-icon><CloseOutline /></n-icon></template>{{ t("common.cancel") }}</n-button>
                     </div>
                     <div v-if="task.error" class="task-error">{{ task.error }}</div>
                         </article>
                     </div>
                 </n-tab-pane>
-                <n-tab-pane name="failures" :tab="`失败项目 ${failureRecords.length}`">
+                <n-tab-pane name="failures" :tab="t('task_center.failures', { count: failureRecords.length })">
                     <div class="task-toolbar">
                         <n-button quaternary :disabled="failureRecords.length === 0" @click="clearFailures">
                             <template #icon><n-icon><TrashOutline /></n-icon></template>
-                            清空失败记录
+                            {{ t("task_center.clear_failures") }}
                         </n-button>
                     </div>
-                    <n-empty v-if="failureRecords.length === 0" description="暂无失败项目" />
+                    <n-empty v-if="failureRecords.length === 0" :description="t('task_center.empty_failures')" />
                     <div v-else class="task-list">
                         <article v-for="failure in failureRecords" :key="failure.id" class="task-item">
                             <div class="task-header">
-                                <strong>{{ failure.name || failure.path || "未知项目" }}</strong>
+                                <strong>{{ failure.name || failure.path || t("task_center.unknown_item") }}</strong>
                                 <n-tag size="small" type="error">{{ kindText(failure.kind) }}</n-tag>
                             </div>
                             <div v-if="failure.path" class="failure-path">{{ failure.path }}</div>
@@ -164,9 +165,9 @@
                                     @click="openFailureItem(failure.itemId)"
                                 >
                                     <template #icon><n-icon><EyeOutline /></n-icon></template>
-                                    在 Pixcall 中定位
+                                    {{ t("task_center.locate_item") }}
                                 </n-button>
-                                <n-button size="small" quaternary circle title="删除记录" @click="clearFailure(failure.id)">
+                                <n-button size="small" quaternary circle :title="t('task_center.delete_record')" @click="clearFailure(failure.id)">
                                     <template #icon><n-icon><TrashOutline /></n-icon></template>
                                 </n-button>
                             </div>

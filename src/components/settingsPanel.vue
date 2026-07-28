@@ -116,7 +116,9 @@
         const id = `embedding-${Date.now()}-${Math.random().toString(16).slice(2)}`;
         formData.value.embeddingRemoteProfiles.push({
             id,
-            name: `远程接口 ${formData.value.embeddingRemoteProfiles.length + 1}`,
+            name: t.value("settings.remote_embedding_default_name", {
+                number: formData.value.embeddingRemoteProfiles.length + 1,
+            }),
             provider: formData.value.embeddingProvider,
             endpoint: formData.value.endpoint,
             apiKey: formData.value.apiKey,
@@ -437,17 +439,17 @@
                     label: profile.name || profile.model || profile.endpoint,
                     value: profile.id,
                 }))"
-                placeholder="选择远程接口"
+                :placeholder="t('settings.remote_embedding_select')"
             />
-            <n-button @click="addRemoteProfile()">新增</n-button>
-            <n-button :disabled="!formData.embeddingRemoteProfileId" @click="removeRemoteProfile">删除</n-button>
+            <n-button @click="addRemoteProfile()">{{ t("common.add") }}</n-button>
+            <n-button :disabled="!formData.embeddingRemoteProfileId" @click="removeRemoteProfile">{{ t("common.remove") }}</n-button>
         </n-form-item>
 
-        <n-form-item label="接口名称">
+        <n-form-item :label="t('settings.remote_embedding_name')">
             <n-input
                 v-if="activeProfile()"
                 v-model:value="activeProfile()!.name"
-                placeholder="例如：主站、备用中转站"
+                :placeholder="t('settings.remote_embedding_name_placeholder')"
             />
         </n-form-item>
 

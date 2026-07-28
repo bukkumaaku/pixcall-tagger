@@ -1,4 +1,5 @@
 import { computed, reactive } from "vue";
+import { translate } from "./i18n";
 
 export type TaskKind = "wd" | "llm" | "embedding" | "search" | "download";
 export type TaskStatus = "running" | "paused" | "completed" | "failed" | "cancelled";
@@ -39,7 +40,7 @@ const controls = new Map<string, { paused: boolean; cancelRequested: boolean }>(
 
 export class TaskCancelledError extends Error {
     constructor() {
-        super("任务已取消");
+        super(translate("task_center.cancelled_error"));
         this.name = "TaskCancelledError";
     }
 }
@@ -57,7 +58,7 @@ export function beginTask(kind: TaskKind, title: string, total = 0, controllable
         id: `task-${Date.now()}-${++sequence}`,
         kind,
         title,
-        detail: "准备中",
+        detail: translate("task_center.preparing"),
         status: "running",
         completed: 0,
         total: Math.max(0, total),
@@ -77,7 +78,7 @@ export function pauseTask(taskId: string) {
     if (!control || !task || task.status !== "running") return;
     control.paused = true;
     task.status = "paused";
-    task.detail = "当前步骤完成后暂停";
+    task.detail = translate("task_center.pause_pending");
 }
 
 export function resumeTask(taskId: string) {
@@ -86,7 +87,7 @@ export function resumeTask(taskId: string) {
     if (!control || !task || task.status !== "paused") return;
     control.paused = false;
     task.status = "running";
-    task.detail = "继续执行";
+    task.detail = translate("task_center.resumed");
 }
 
 export function requestTaskCancel(taskId: string) {
@@ -96,7 +97,7 @@ export function requestTaskCancel(taskId: string) {
     control.cancelRequested = true;
     control.paused = false;
     task.status = "running";
-    task.detail = "当前步骤完成后取消";
+    task.detail = translate("task_center.cancel_pending");
 }
 
 export async function waitForTaskControl(taskId: string) {
@@ -123,17 +124,25 @@ export function updateTask(
     task.total = Math.max(0, task.total);
 }
 
-export function completeTask(taskId: string, detail = "已完成") {
+export function completeTask(
+    taskId: string,
+    detail = translate("task_center.completed"),
+) {
     finishTask(taskId, "completed", detail);
 }
 
 export function failTask(taskId: string, error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    finishTask(taskId, "failed", "执行失败", message);
+    finishTask(
+        taskId,
+        "failed",
+        translate("task_center.execution_failed"),
+        message,
+    );
 }
 
 export function cancelTask(taskId: string) {
-    finishTask(taskId, "cancelled", "已取消");
+    finishTask(taskId, "cancelled", translate("task_center.cancelled"));
 }
 
 export function clearFinishedTasks() {

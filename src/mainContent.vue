@@ -175,7 +175,7 @@
                     type="button"
                     class="sider-toggle"
                     :class="{ 'sider-toggle--collapsed': collapsed }"
-                    :title="collapsed ? '展开' : '收起'"
+                    :title="collapsed ? t('nav.expand') : t('nav.collapse')"
                     @click="collapsed = !collapsed"
                 >
                     <n-icon

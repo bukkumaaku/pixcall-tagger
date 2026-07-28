@@ -100,7 +100,7 @@ async function startWorker() {
         await new Promise((resolve) => setTimeout(resolve, 250));
         if (await workerHealth()) return;
     }
-    throw new Error(`ai-worker 未能在 127.0.0.1:${WORKER_PORT} 启动`);
+    throw new Error(translate("startup.worker_start_failed", { port: WORKER_PORT }));
 }
 
 async function shutdownLegacyWorkers() {

@@ -1,4 +1,5 @@
 import { getBackendClient } from "./backendClient";
+import { translate } from "./i18n";
 
 export type TaggerBackupItem = {
     id: string;
@@ -31,7 +32,7 @@ export const scopedTaggerBackupDirectory = (
     source: TaggerBackupSource,
     category: TaggerBackupCategory,
 ) => {
-    if (!root.trim()) throw new Error("模型目录为空，无法定位备份目录");
+    if (!root.trim()) throw new Error(translate("backup.model_root_empty"));
     const separator = root.includes("\\") ? "\\" : "/";
     return [root.replace(/[\\/]+$/g, ""), "backup", source, category].join(separator);
 };
@@ -40,9 +41,9 @@ const safeOperationName = (operation: TaggerBackup["operation"]) =>
     operation.replace(/[^a-z0-9-]/gi, "-");
 
 const operationLabel = (operation: TaggerBackup["operation"]) => ({
-    wd: "WD 标签",
-    "llm-tag": "LLM 标签",
-    "llm-annotation": "LLM 注释",
+    wd: translate("backup.operation_wd"),
+    "llm-tag": translate("backup.operation_llm_tag"),
+    "llm-annotation": translate("backup.operation_llm_annotation"),
 })[operation];
 
 export async function createTaggerBackupInDirectory(
@@ -51,7 +52,7 @@ export async function createTaggerBackupInDirectory(
     items: any[],
     source?: TaggerBackupSource,
 ): Promise<string> {
-    if (!directory.trim()) throw new Error("备份目录为空，无法创建备份");
+    if (!directory.trim()) throw new Error(translate("backup.directory_empty"));
     const createdAt = new Date().toISOString();
     const stamp = createdAt.replace(/[:.]/g, "-");
     const suffix = Math.random().toString(36).slice(2, 8);
@@ -91,7 +92,11 @@ export async function listTaggerBackupsInDirectory(
                     (backup.operation === "llm-annotation" ? "annotations" : "tags");
                 if (expectedCategory && category !== expectedCategory) return null;
                 return {
-                    label: `${backup.createdAt} · ${operationLabel(backup.operation)} · ${backup.items.length} 项`,
+                    label: translate("backup.option_label", {
+                        createdAt: backup.createdAt,
+                        operation: operationLabel(backup.operation),
+                        count: backup.items.length,
+                    }),
                     value: entry.path,
                     createdAt: backup.createdAt,
                     itemCount: backup.items.length,
@@ -115,7 +120,7 @@ export async function restoreTaggerBackup(
 ): Promise<{ restored: number; skipped: number }> {
     const backup = await readTaggerBackup(backupPath);
     if (backup.source && expectedSource && backup.source !== expectedSource) {
-        throw new Error("该备份属于另一个宿主，已取消恢复");
+        throw new Error(translate("backup.wrong_host"));
     }
     let restored = 0;
     let skipped = 0;
@@ -150,7 +155,7 @@ async function readTaggerBackup(backupPath: string): Promise<TaggerBackup> {
         !Array.isArray(parsed.items) ||
         typeof parsed.createdAt !== "string"
     ) {
-        throw new Error("备份文件格式无效");
+        throw new Error(translate("backup.invalid_file"));
     }
     return parsed as TaggerBackup;
 }

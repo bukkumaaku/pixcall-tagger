@@ -1,3 +1,5 @@
+import { translate } from "./i18n";
+
 let resourceRoot = "";
 
 export async function initializeRuntimePaths() {
@@ -19,7 +21,7 @@ export function joinPath(...parts: string[]) {
 
 export function resolveResourcePath(filePath: string) {
     if (isAbsolutePath(filePath)) return filePath;
-    if (!resourceRoot) throw new Error("插件资源目录尚未初始化");
+    if (!resourceRoot) throw new Error(translate("startup.resource_root_uninitialized"));
     return joinPath(resourceRoot, filePath.replace(/^src[\\/]public[\\/]/, ""));
 }
 

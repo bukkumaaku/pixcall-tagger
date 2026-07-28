@@ -17,11 +17,16 @@ export async function initializeI18n() {
     messages = locale.startsWith("zh") ? zhCN : en;
 }
 
-export function translate(key: string) {
+export type TranslationParams = Record<string, string | number>;
+
+export function translate(key: string, params?: TranslationParams) {
     let value: unknown = messages;
     for (const part of key.split(".")) {
         if (!value || typeof value !== "object" || !(part in value)) return key;
         value = (value as Record<string, unknown>)[part];
     }
-    return typeof value === "string" ? value : key;
+    if (typeof value !== "string") return key;
+    return value.replace(/\{\{(\w+)\}\}/g, (match, name: string) =>
+        params && name in params ? String(params[name]) : match,
+    );
 }

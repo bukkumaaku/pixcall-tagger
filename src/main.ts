@@ -4,7 +4,7 @@ import App from "./App.vue";
 import { getBackendClient } from "./services/backendClient";
 import { installPixcallHost } from "./services/pixcallClient";
 import { initializeRuntimePaths } from "./services/pathUtils";
-import { initializeI18n } from "./services/i18n";
+import { initializeI18n, translate } from "./services/i18n";
 
 async function bootstrap() {
     installPixcallHost();
@@ -20,5 +20,7 @@ async function bootstrap() {
 
 void bootstrap().catch((error) => {
     console.error("Failed to initialize Pixcall AI Tagger", error);
-    document.querySelector("#app")!.textContent = `应用初始化失败：${error instanceof Error ? error.message : String(error)}`;
+    document.querySelector("#app")!.textContent = translate("startup.initialization_failed", {
+        error: error instanceof Error ? error.message : String(error),
+    });
 });

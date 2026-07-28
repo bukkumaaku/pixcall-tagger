@@ -214,7 +214,7 @@ import {
             if (throwOnFailure) throw new Error(message);
             return;
         }
-        const startedTask = beginTask("wd", "WD 批量打标");
+        const startedTask = beginTask("wd", t.value("index.task_title"));
         if (!startedTask) return;
         taskId.value = startedTask;
         isTagging.value = true;
@@ -225,7 +225,7 @@ import {
             await backenAPI.setConfig();
             const items = targetItems || await backenAPI.initialize(isAll);
             const model = await resolveSelectedModel();
-            if (!model) throw new Error("无法定位当前 WD 模型目录，已取消打标");
+            if (!model) throw new Error(t.value("index.model_directory_missing"));
             if (!props.skipBackup) {
                 await createTaggerBackupInDirectory(
                     scopedTaggerBackupDirectory(
@@ -242,24 +242,26 @@ import {
             allItem.value = items.length;
             completeItem.value = 0;
             updateTask(startedTask, {
-                detail: "正在加载模型",
+                detail: t.value("common.loading_model"),
                 total: items.length,
             });
             const result = await backenAPI.startGetTag(items);
             if (result.failureCount > 0) {
                 const error = new Error(
-                    `WD 打标有 ${result.failureCount} 个项目失败`,
+                    t.value("index.failure_count", {
+                        count: result.failureCount,
+                    }),
                 );
                 if (throwOnFailure) throw error;
                 failTask(startedTask, error);
             } else {
-                completeTask(startedTask, "打标完成");
+                completeTask(startedTask, t.value("index.task_completed"));
             }
         } catch (error) {
             workflowError = error;
             if (isTaskCancelled(error)) {
                 cancelTask(startedTask);
-                notification("WD 打标已取消", "warning");
+                notification(t.value("index.task_cancelled"), "warning");
             } else {
                 failTask(startedTask, error);
                 notification(error instanceof Error ? error.message : String(error), "error");
@@ -301,7 +303,7 @@ import {
     watch([completeItem, allItem], ([completed, total]) => {
         if (taskId.value) {
             updateTask(taskId.value, {
-                detail: "正在写入标签",
+                detail: t.value("common.writing_tags"),
                 completed,
                 total,
             });
@@ -348,7 +350,7 @@ import {
                 (id) => eagle.item.getById(id),
                 TAGGER_BACKUP_SOURCE,
             );
-            notification(`已恢复 ${result.restored} 项，跳过 ${result.skipped} 项`, "success");
+            notification(t.value("backup.restored_summary", result), "success");
         } catch (error) {
             notification(error instanceof Error ? error.message : String(error), "error");
         } finally {
@@ -414,7 +416,7 @@ import {
                 :step="0.01"
             />
             <small class="threshold-hint">
-                WD 类模型建议 0.35，CL、CA 类模型建议 0.75
+                {{ t("index.threshold_hint") }}
             </small>
         </n-form-item>
         <n-form-item :label="t('index.batch_size')" path="steps">
@@ -481,12 +483,13 @@ import {
                 :disabled="formData.language !== 'mix'"
             />
         </n-form-item>
-        <n-form-item label="标签备份">
+        <n-form-item :label="t('backup.tag_title')">
+            <FormHelp :content="t('backup.tag_description')" />
             <n-select
                 v-model:value="selectedBackup"
                 :options="backups"
                 clearable
-                placeholder="选择要恢复的标签备份"
+                :placeholder="t('backup.select_tag')"
                 :disabled="isTagging || isRestoring || backups.length === 0"
             />
             <n-button
@@ -495,7 +498,7 @@ import {
                 :disabled="!selectedBackup || isTagging"
                 @click="restoreSelectedBackup"
             >
-                恢复标签
+                {{ t("backup.restore_tag") }}
             </n-button>
         </n-form-item>
         <div class="form-actions">
