@@ -106,7 +106,7 @@
         return () => h(NIcon, null, { default: () => h(icon) });
     };
 
-    const menuOptions: MenuOption[] = [
+    const menuOptions = computed<MenuOption[]>(() => [
         {
             label: t.value("nav.wd"),
             key: "wdtype",
@@ -132,7 +132,7 @@
             key: "settings",
             icon: renderIcon(SettingsOutline),
         },
-    ];
+    ]);
 
     const clickOption = (key: string) => {
         if ((backenAPI.is_processing || isTaskRunning.value) && key !== currentPage.value) {
