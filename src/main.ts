@@ -20,9 +20,6 @@ async function bootstrap() {
     // process. Mount the UI first so the plugin never presents a blank window.
     void backend.start({ rethrow: true }).catch((error) => {
         console.error("Failed to start ai-worker", error);
-        window.dispatchEvent(new CustomEvent("pixcall-worker-startup-error", {
-            detail: error instanceof Error ? error.message : String(error),
-        }));
     });
 }
 
