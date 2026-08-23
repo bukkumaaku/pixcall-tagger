@@ -1,7 +1,7 @@
 {
     "name": "pixcall-auto-tagger",
     "private": true,
-    "version": "2.2.2",
+    "version": "2.2.3",
     "type": "module",
     "scripts": {
         "worker:debug": "cargo build --manifest-path backend/Cargo.toml -p ai-worker && node scripts/copy-worker.mjs debug",
