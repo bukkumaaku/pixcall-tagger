@@ -43,8 +43,13 @@ export async function closePixcallWindow() {
 
 async function pixcallSend<T>(endpoint: string, payload: Record<string, unknown>): Promise<T> {
     if (!pixcallBaseUrl) {
-        const port = await getPixcallContext<number>("serverPort");
-        pixcallBaseUrl = `http://127.0.0.1:${port || 22510}`;
+        const context = await getPixcallContext<unknown>("serverPort");
+        const port = typeof context === "number"
+            ? context
+            : context && typeof context === "object" && "port" in context
+                ? Number((context as { port?: unknown }).port)
+                : Number(context);
+        pixcallBaseUrl = `http://127.0.0.1:${Number.isFinite(port) && port > 0 ? port : 22510}`;
     }
     const response = await fetch(`${pixcallBaseUrl}/${endpoint}`, {
         method: "POST",
@@ -166,8 +171,14 @@ async function startWorker() {
         : {};
     const platform = window.pixcall?.platform;
     const platformName = String(env.platform || "").toLowerCase();
-    const isWindows = platform?.isWindows === true || platformName.startsWith("win");
-    const isMacOS = platform?.isMacOS === true || platformName === "macos" || platformName === "darwin";
+    const userAgent = String(navigator.userAgent || "").toLowerCase();
+    const isWindows = platform?.isWindows === true
+        || platformName.startsWith("win")
+        || userAgent.includes("windows");
+    const isMacOS = platform?.isMacOS === true
+        || platformName === "macos"
+        || platformName === "darwin"
+        || userAgent.includes("mac os");
     const workerDirectory = isWindows
         ? "win-x64"
         : isMacOS

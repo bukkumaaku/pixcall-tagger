@@ -21,7 +21,12 @@ async function bootstrap() {
 
 void bootstrap().catch((error) => {
     console.error("Failed to initialize Pixcall AI Tagger", error);
-    document.querySelector("#app")!.textContent = translate("startup.initialization_failed", {
+    const message = translate("startup.initialization_failed", {
         error: error instanceof Error ? error.message : String(error),
     });
+    const app = document.querySelector("#app");
+    if (app) {
+        app.textContent = message;
+        app.setAttribute("data-startup-error", "true");
+    }
 });
