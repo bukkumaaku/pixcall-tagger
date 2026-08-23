@@ -229,16 +229,16 @@ class PixcallClient {
     }
 
     private async resolveEntryPath(entry: PixcallEntry) {
-        if (entry.source_path) return entry.source_path;
+        if (entry.source_path) return normalizeLocalPath(entry.source_path);
         const result = await this.request<unknown>({
             type: "get_entry_path",
             id: normalizeId(entry.id),
         });
-        if (typeof result === "string") return result;
+        if (typeof result === "string") return normalizeLocalPath(result);
         if (result && typeof result === "object") {
             const record = result as Record<string, unknown>;
             for (const key of ["path", "file_path", "filePath", "source_path"]) {
-                if (typeof record[key] === "string") return record[key] as string;
+                if (typeof record[key] === "string") return normalizeLocalPath(record[key] as string);
             }
         }
         throw new Error(translate("pixcall.item_path_missing", { name: entry.name || entry.id }));
@@ -297,6 +297,21 @@ class PixcallClient {
 
 function normalizeId(id: string) {
     return id.replace(/^~n/, "");
+}
+
+function normalizeLocalPath(value: string) {
+    const candidate = value.trim();
+    if (!/^file:/i.test(candidate)) return candidate;
+    try {
+        const url = new URL(candidate);
+        const pathname = decodeURIComponent(url.pathname);
+        const windowsPath = url.host && /^[A-Za-z]:$/.test(url.host)
+            ? `${url.host}${pathname}`
+            : pathname;
+        return windowsPath.replace(/^\/+([A-Za-z]:)/, "$1").replace(/\//g, "\\");
+    } catch {
+        return candidate;
+    }
 }
 
 function extensionFrom(entry: PixcallEntry) {

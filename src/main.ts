@@ -4,12 +4,13 @@ import App from "./App.vue";
 import { getBackendClient } from "./services/backendClient";
 import { installPixcallHost } from "./services/pixcallClient";
 import { initializeRuntimePaths } from "./services/pathUtils";
+import { pluginRootPath } from "./services/pixcallBridge";
 import { initializeI18n, translate } from "./services/i18n";
 
 async function bootstrap() {
     installPixcallHost();
     await initializeI18n();
-    await initializeRuntimePaths();
+    await initializeRuntimePaths(await pluginRootPath());
     const backend = getBackendClient();
     backend.start();
     const disposeWorker = () => backend.dispose();

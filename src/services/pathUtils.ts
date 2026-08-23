@@ -2,7 +2,11 @@ import { translate } from "./i18n";
 
 let resourceRoot = "";
 
-export async function initializeRuntimePaths() {
+export async function initializeRuntimePaths(root?: string) {
+    if (root) {
+        resourceRoot = root;
+        return;
+    }
     const pathname = decodeURIComponent(window.location.pathname).replace(/^\/+([A-Za-z]:)/, "$1");
     resourceRoot = dirname(pathname.replace(/\//g, "\\"));
 }
