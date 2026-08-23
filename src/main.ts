@@ -12,7 +12,7 @@ async function bootstrap() {
     await initializeI18n();
     await initializeRuntimePaths(await pluginRootPath());
     const backend = getBackendClient();
-    backend.start();
+    await backend.start({ rethrow: true });
     const disposeWorker = () => backend.dispose();
     window.addEventListener("beforeunload", disposeWorker, { once: true });
     window.addEventListener("pagehide", disposeWorker, { once: true });

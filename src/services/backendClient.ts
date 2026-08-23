@@ -87,12 +87,13 @@ export class BackendClient {
         return this.generation;
     }
 
-    start() {
-        if (this.running) return;
+    start(options: { rethrow?: boolean } = {}): Promise<void> {
+        if (this.running) return Promise.resolve();
         this.running = true;
-        void ensureWorker().catch((error) => {
+        return ensureWorker().catch((error) => {
             this.running = false;
             console.error("Failed to start ai-worker", error);
+            if (options.rethrow) throw error;
         });
     }
 
