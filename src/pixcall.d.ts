@@ -33,7 +33,8 @@ declare global {
     interface Window {
         eagle: typeof eagle;
         pixcall?: {
-            getContext(name: "settings" | "serverPort" | "initMessage"): Promise<unknown>;
+            getContext(name?: string): Promise<unknown>;
+            request?<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
             showOpenDialog(options: { properties?: string[] }): Promise<{ canceled: boolean; filePaths: string[] }>;
             platform: { isMacOS: boolean; isWindows: boolean; isLinux: boolean };
         };

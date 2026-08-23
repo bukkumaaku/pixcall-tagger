@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
+import { copyFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,11 +28,24 @@ if (!localeFiles.includes(`${manifest.default_locale}.json`)) {
 }
 for (const localeFile of localeFiles) {
     const localePath = path.join(dist, "l10n", localeFile);
-    const locale = await stat(localePath).catch(() => null);
-    if (!locale?.isFile() || locale.size === 0) {
+    const localeStat = await stat(localePath).catch(() => null);
+    if (!localeStat?.isFile() || localeStat.size === 0) {
         throw new Error(`required locale artifact is missing or empty: ${localePath}`);
     }
-    JSON.parse(await readFile(localePath, "utf8"));
+    const locale = JSON.parse(await readFile(localePath, "utf8"));
+    const flatLocale = {};
+    const flatten = (value, prefix = "") => {
+        if (typeof value === "string") {
+            if (prefix) flatLocale[prefix] = value;
+            return;
+        }
+        if (!value || typeof value !== "object" || Array.isArray(value)) return;
+        for (const [key, child] of Object.entries(value)) {
+            flatten(child, prefix ? `${prefix}.${key}` : key);
+        }
+    };
+    flatten(locale);
+    await writeFile(localePath, `${JSON.stringify(flatLocale, null, 2)}\n`, "utf8");
 }
 
 const assetsDirectory = path.join(dist, "assets");

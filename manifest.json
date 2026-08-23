@@ -6,35 +6,42 @@
   "author": "kankan",
   "homepage": "https://github.com/bukkumaaku/pixcall-tagger",
   "icon": "icon.png",
-  "plugin_type": "modal",
-  "main": "index.html",
-  "minimum_core_version": "0.9.5",
+  "minimum_core_version": "0.9.7",
   "manifest_version": 2,
-  "window": {
-    "width": 1250,
-    "height": 850,
-    "min_width": 960,
-    "min_height": 640,
-    "max_width": 1800,
-    "max_height": 1200,
-    "resizable": true,
-    "movable": true,
-    "modal": false
+  "platform_arch": ["windows-x64", "macos-arm64"],
+  "permissions": {
+    "fs": { "read": true, "write": true },
+    "sqlite": { "read": true, "write": true },
+    "storage": true
   },
   "contributes": {
     "commands": [
       {
         "command": "ai-tagger",
         "title": "AI 自动标签",
+        "kind": "window",
+        "entry": "index.html",
         "icon": {
           "light": "icons/context-menu.png",
           "dark": "icons/context-menu.png"
+        },
+        "window": {
+          "width": 1250,
+          "height": 850,
+          "min_width": 960,
+          "min_height": 640,
+          "max_width": 1800,
+          "max_height": 1200,
+          "resizable": true,
+          "movable": true,
+          "modal": false
         }
       }
     ],
-    "context_menus": [
+      "context_menus": [
       {
         "command": "ai-tagger",
+        "location": "entry_list",
         "when": "has_selection"
       }
     ]

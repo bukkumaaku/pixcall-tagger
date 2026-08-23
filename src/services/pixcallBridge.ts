@@ -17,9 +17,13 @@ let shutdownRequested = false;
 
 export type PixcallContext = "settings" | "serverPort" | "initMessage";
 
-export async function getPixcallContext<T>(name: PixcallContext): Promise<T | null> {
+export async function getPixcallContext<T>(name?: string): Promise<T | null> {
     if (!window.pixcall?.getContext) return null;
-    return (await window.pixcall.getContext(name)) as T;
+    try {
+        return (await window.pixcall.getContext(name)) as T;
+    } catch {
+        return null;
+    }
 }
 
 export async function pixcallRequest<T>(payload: Record<string, unknown>): Promise<T> {
@@ -51,10 +55,49 @@ async function pixcallSend<T>(endpoint: string, payload: Record<string, unknown>
     return (text ? JSON.parse(text) : null) as T;
 }
 
-export function pluginRootPath() {
-    if (window.location.protocol !== "file:") return dirname(decodeURIComponent(window.location.pathname));
+function pathFromFileUrl() {
+    if (window.location.protocol !== "file:") return "";
     const pathname = decodeURIComponent(window.location.pathname).replace(/^\/+([A-Za-z]:)/, "$1");
     return dirname(pathname.replace(/\//g, "\\"));
+}
+
+function normalizeAbsolutePath(value: unknown) {
+    if (typeof value !== "string") return "";
+    if (/^file:/i.test(value)) {
+        try {
+            const url = new URL(value);
+            const pathname = decodeURIComponent(url.pathname).replace(/^\/+([A-Za-z]:)/, "$1");
+            return pathname.replace(/\//g, "\\");
+        } catch {
+            return "";
+        }
+    }
+    return /^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value) || value.startsWith("/")
+        ? value
+        : "";
+}
+
+export async function pluginRootPath() {
+    const context = await getPixcallContext<Record<string, unknown>>("");
+    const plugin = context?.plugin && typeof context.plugin === "object"
+        ? context.plugin as Record<string, unknown>
+        : {};
+    const candidates = [
+        plugin.path,
+        plugin.directory,
+        plugin.dir,
+        plugin.root,
+        plugin.rootPath,
+        context?.pluginPath,
+        context?.pluginDirectory,
+        context?.pluginRoot,
+        context?.resourcePath,
+    ];
+    const root = candidates.map(normalizeAbsolutePath).find(Boolean);
+    if (root) return root;
+    const fileRoot = pathFromFileUrl();
+    if (fileRoot) return fileRoot;
+    throw new Error(translate("startup.resource_root_uninitialized"));
 }
 
 export async function ensureWorker() {
@@ -72,15 +115,22 @@ async function startWorker() {
     await shutdownLegacyWorkers();
     if (await workerHealth()) return;
     await shutdownIncompatibleWorker();
+    const context = await getPixcallContext<Record<string, unknown>>("");
+    const env = context?.env && typeof context.env === "object"
+        ? context.env as Record<string, unknown>
+        : {};
     const platform = window.pixcall?.platform;
-    const workerDirectory = platform?.isWindows
+    const platformName = String(env.platform || "").toLowerCase();
+    const isWindows = platform?.isWindows === true || platformName.startsWith("win");
+    const isMacOS = platform?.isMacOS === true || platformName === "macos" || platformName === "darwin";
+    const workerDirectory = isWindows
         ? "win-x64"
-        : platform?.isMacOS
+        : isMacOS
             ? "mac-arm64"
             : "";
-    const workerExecutable = platform?.isWindows ? "ai-worker.exe" : "ai-worker";
+    const workerExecutable = isWindows ? "ai-worker.exe" : "ai-worker";
     if (!workerDirectory) throw new Error(translate("startup.unsupported_platform"));
-    const root = pluginRootPath();
+    const root = await pluginRootPath();
     const command = joinPath(root, "bin", workerDirectory, workerExecutable);
     await pixcallRequest({
         type: "spawn_child_process",
