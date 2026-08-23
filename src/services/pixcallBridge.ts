@@ -20,7 +20,10 @@ export type PixcallContext = "settings" | "serverPort" | "initMessage";
 export async function getPixcallContext<T>(name?: string): Promise<T | null> {
     if (!window.pixcall?.getContext) return null;
     try {
-        return (await window.pixcall.getContext(name)) as T;
+        return await Promise.race([
+            window.pixcall.getContext(name) as Promise<T>,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 500)),
+        ]);
     } catch {
         return null;
     }
@@ -119,6 +122,11 @@ function contextPathCandidates(value: unknown): unknown[] {
 }
 
 export async function pluginRootPath() {
+    // Repository and installed plugins are loaded from an absolute file URL.
+    // Prefer it because Pixcall 0.9.7 may leave unknown getContext calls pending.
+    const fileRoot = pathFromFileUrl();
+    if (fileRoot) return fileRoot;
+
     // Pixcall 0.9.7 exposes the plugin location under different context names
     // depending on whether the command was opened from the repository or UI.
     const contexts = await Promise.all([
@@ -134,8 +142,6 @@ export async function pluginRootPath() {
         .map(normalizeAbsolutePath)
         .find(Boolean);
     if (root) return root;
-    const fileRoot = pathFromFileUrl();
-    if (fileRoot) return fileRoot;
     throw new Error(translate("startup.resource_root_uninitialized"));
 }
 
