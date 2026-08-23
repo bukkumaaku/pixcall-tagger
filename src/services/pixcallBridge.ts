@@ -206,8 +206,9 @@ async function startWorker() {
         cwd: dirname(command),
     });
     for (let attempt = 0; attempt < 80; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
         if (await workerHealth()) return;
+        const delay = attempt < 10 ? 50 : 250;
+        await new Promise((resolve) => setTimeout(resolve, delay));
     }
     throw new Error(translate("startup.worker_start_failed", { port: WORKER_PORT }));
 }

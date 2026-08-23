@@ -1,3 +1,5 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 fn main() -> Result<(), ai_worker::WorkerError> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if !args
