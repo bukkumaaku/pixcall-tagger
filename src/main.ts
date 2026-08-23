@@ -12,11 +12,18 @@ async function bootstrap() {
     await initializeI18n();
     await initializeRuntimePaths(await pluginRootPath());
     const backend = getBackendClient();
-    await backend.start({ rethrow: true });
     const disposeWorker = () => backend.dispose();
     window.addEventListener("beforeunload", disposeWorker, { once: true });
     window.addEventListener("pagehide", disposeWorker, { once: true });
     createApp(App).mount("#app");
+    // Worker startup may take several seconds while Pixcall creates the child
+    // process. Mount the UI first so the plugin never presents a blank window.
+    void backend.start({ rethrow: true }).catch((error) => {
+        console.error("Failed to start ai-worker", error);
+        window.dispatchEvent(new CustomEvent("pixcall-worker-startup-error", {
+            detail: error instanceof Error ? error.message : String(error),
+        }));
+    });
 }
 
 void bootstrap().catch((error) => {
