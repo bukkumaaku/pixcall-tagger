@@ -56,44 +56,83 @@ async function pixcallSend<T>(endpoint: string, payload: Record<string, unknown>
 }
 
 function pathFromFileUrl() {
-    if (window.location.protocol !== "file:") return "";
-    const pathname = decodeURIComponent(window.location.pathname).replace(/^\/+([A-Za-z]:)/, "$1");
-    return dirname(pathname.replace(/\//g, "\\"));
+    const rawPath = decodeURIComponent(window.location.pathname || "");
+    if (!rawPath) return "";
+    const pathname = rawPath.replace(/^\/+([A-Za-z]:)/, "$1").replace(/\//g, "\\");
+    if (/^[A-Za-z]:\\/.test(pathname) || /^\\\\/.test(pathname)) return dirname(pathname);
+    return window.location.protocol === "file:" ? dirname(pathname) : "";
 }
 
 function normalizeAbsolutePath(value: unknown) {
     if (typeof value !== "string") return "";
-    if (/^file:/i.test(value)) {
+    const candidate = value.trim();
+    if (!candidate) return "";
+    if (/^file:/i.test(candidate)) {
         try {
-            const url = new URL(value);
-            const pathname = decodeURIComponent(url.pathname).replace(/^\/+([A-Za-z]:)/, "$1");
-            return pathname.replace(/\//g, "\\");
+            const url = new URL(candidate);
+            const pathname = decodeURIComponent(url.pathname);
+            const windowsPath = url.host && /^[A-Za-z]:$/.test(url.host)
+                ? `${url.host}${pathname}`
+                : pathname;
+            return windowsPath.replace(/^\/+([A-Za-z]:)/, "$1").replace(/\//g, "\\");
         } catch {
             return "";
         }
     }
-    return /^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value) || value.startsWith("/")
-        ? value
+    return /^[A-Za-z]:[\\/]/.test(candidate) || /^\\\\/.test(candidate) || candidate.startsWith("/")
+        ? candidate
         : "";
 }
 
-export async function pluginRootPath() {
-    const context = await getPixcallContext<Record<string, unknown>>("");
-    const plugin = context?.plugin && typeof context.plugin === "object"
-        ? context.plugin as Record<string, unknown>
+function contextPathCandidates(value: unknown): unknown[] {
+    if (typeof value === "string") return [value];
+    if (!value || typeof value !== "object") return [];
+    const record = value as Record<string, unknown>;
+    const plugin = record.plugin && typeof record.plugin === "object"
+        ? record.plugin as Record<string, unknown>
         : {};
-    const candidates = [
+    const paths = record.paths && typeof record.paths === "object"
+        ? record.paths as Record<string, unknown>
+        : {};
+    return [
         plugin.path,
         plugin.directory,
         plugin.dir,
         plugin.root,
         plugin.rootPath,
-        context?.pluginPath,
-        context?.pluginDirectory,
-        context?.pluginRoot,
-        context?.resourcePath,
+        plugin.pluginPath,
+        record.pluginPath,
+        record.plugin_path,
+        record.pluginDirectory,
+        record.plugin_directory,
+        record.pluginRoot,
+        record.plugin_root,
+        record.resourcePath,
+        record.resource_path,
+        record.resourceRoot,
+        record.resource_root,
+        paths.plugin,
+        paths.pluginPath,
+        paths.resource,
+        paths.resourcePath,
     ];
-    const root = candidates.map(normalizeAbsolutePath).find(Boolean);
+}
+
+export async function pluginRootPath() {
+    // Pixcall 0.9.7 exposes the plugin location under different context names
+    // depending on whether the command was opened from the repository or UI.
+    const contexts = await Promise.all([
+        getPixcallContext<Record<string, unknown>>(),
+        getPixcallContext<Record<string, unknown>>("plugin"),
+        getPixcallContext<Record<string, unknown>>("pluginPath"),
+        getPixcallContext<Record<string, unknown>>("pluginRoot"),
+        getPixcallContext<Record<string, unknown>>("path"),
+        getPixcallContext<Record<string, unknown>>("resourcePath"),
+    ]);
+    const root = contexts
+        .flatMap(contextPathCandidates)
+        .map(normalizeAbsolutePath)
+        .find(Boolean);
     if (root) return root;
     const fileRoot = pathFromFileUrl();
     if (fileRoot) return fileRoot;
@@ -132,6 +171,9 @@ async function startWorker() {
     if (!workerDirectory) throw new Error(translate("startup.unsupported_platform"));
     const root = await pluginRootPath();
     const command = joinPath(root, "bin", workerDirectory, workerExecutable);
+    if (!command || command === workerExecutable) {
+        throw new Error(`${translate("startup.resource_root_uninitialized")} (worker path is empty)`);
+    }
     await pixcallRequest({
         type: "spawn_child_process",
         command,
