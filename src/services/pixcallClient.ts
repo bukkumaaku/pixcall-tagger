@@ -81,14 +81,17 @@ class PixcallClient {
 
     async getSelectedItems() {
         await this.getSettings();
-        const entries = await this.request<PixcallEntry[]>({ type: "get_selected_entries" });
-        if (entries?.length) return this.hydrateEntries(entries);
+        const selected = await this.request<EntryListResponse>({
+            type: "get_selected_entries",
+            limit: 10000,
+        });
+        if (selected.entries?.length) return this.hydrateEntries(selected.entries);
 
         const initMessage = await getPixcallContext<{ data?: { selection?: string[] } }>("initMessage");
         const selection = initMessage?.data?.selection?.map(normalizeId) || [];
         if (selection.length > 0) {
             const result = await this.request<EntryListResponse>({
-                type: "get_entries",
+                type: "get_entries_by_ids",
                 ids: selection,
             });
             return this.hydrateEntries(result.entries || []);
@@ -103,7 +106,7 @@ class PixcallClient {
         const entries: PixcallEntry[] = [];
         for (let offset = 0; offset < ids.length; offset += 500) {
             const result = await this.request<EntryListResponse>({
-                type: "get_entries",
+                type: "get_entries_by_ids",
                 ids: ids.slice(offset, offset + 500),
             });
             entries.push(...(result.entries || []));
@@ -176,7 +179,7 @@ class PixcallClient {
         const missingIds = [...new Set(normalizedIds.filter((id) => !this.entries.has(id)))];
         for (let offset = 0; offset < missingIds.length; offset += 500) {
             const result = await this.request<EntryListResponse>({
-                type: "get_entries",
+                type: "get_entries_by_ids",
                 ids: missingIds.slice(offset, offset + 500),
             });
             for (const entry of result.entries || []) {
