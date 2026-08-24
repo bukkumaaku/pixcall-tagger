@@ -6,6 +6,7 @@ import { translate } from "./i18n";
 // current protocol implementation after the plugin is upgraded.
 const WORKER_PORT = 22514;
 const WORKER_TOKEN = "pixcall-ai-tagger-v4";
+const WORKER_LOCK_NAME = "pixcall-ai-tagger-worker-startup";
 const LEGACY_WORKERS = [
     { port: 22513, token: "pixcall-ai-tagger-v3" },
     { port: 22512, token: "pixcall-ai-tagger-v2" },
@@ -151,13 +152,21 @@ export async function pluginRootPath() {
 }
 
 export async function ensureWorker() {
-    workerReady ??= startWorker();
+    workerReady ??= withWorkerStartupLock(startWorker);
     try {
         await workerReady;
     } catch (error) {
         workerReady = null;
         throw error;
     }
+}
+
+async function withWorkerStartupLock(task: () => Promise<void>) {
+    // Multiple Pixcall windows can open the plugin concurrently. Coordinate
+    // startup so they cannot spawn competing workers on the same port.
+    const locks = navigator.locks;
+    if (!locks) return task();
+    return locks.request(WORKER_LOCK_NAME, { mode: "exclusive" }, task);
 }
 
 async function startWorker() {

@@ -9,7 +9,7 @@
     } from "naive-ui";
     import { CloseOutline, RemoveOutline } from "@vicons/ionicons5";
     import MainContent from "./mainContent.vue";
-    import { closePixcallWindow, shutdownWorker } from "./services/pixcallBridge";
+    import { closePixcallWindow } from "./services/pixcallBridge";
     import { getBackendClient } from "./services/backendClient";
     import { t } from "./api/backen";
 
@@ -19,7 +19,6 @@
     };
 
     const closeWindow = async () => {
-        void shutdownWorker();
         await closePixcallWindow();
     };
 </script>

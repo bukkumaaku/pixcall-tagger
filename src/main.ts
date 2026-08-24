@@ -12,9 +12,6 @@ async function bootstrap() {
     await initializeI18n();
     await initializeRuntimePaths(await pluginRootPath());
     const backend = getBackendClient();
-    const disposeWorker = () => backend.dispose();
-    window.addEventListener("beforeunload", disposeWorker, { once: true });
-    window.addEventListener("pagehide", disposeWorker, { once: true });
     createApp(App).mount("#app");
     // Worker startup may take several seconds while Pixcall creates the child
     // process. Mount the UI first so the plugin never presents a blank window.

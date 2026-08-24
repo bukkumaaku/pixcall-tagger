@@ -350,7 +350,6 @@ import {
     onBeforeUnmount(() => {
         if (saveTimer) clearTimeout(saveTimer);
         void persistForm();
-        void unloadSession();
     });
 
     const resetCurrentPrompt = () => {
