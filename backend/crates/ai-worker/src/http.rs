@@ -1,6 +1,10 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -75,15 +79,13 @@ pub fn run<H: CommandHandler>(
 ) -> Result<(), HttpServerError> {
     let listener = TcpListener::bind(("127.0.0.1", port))?;
     listener.set_nonblocking(host_port.is_some())?;
-    let mut host_watchdog = host_port.map(HostWatchdog::new);
+    let stop_requested = Arc::new(AtomicBool::new(false));
+    let watchdog = host_port.map(|port| {
+        let stop_requested = Arc::clone(&stop_requested);
+        thread::spawn(move || HostWatchdog::new(port).run(stop_requested))
+    });
     let mut shutdown = false;
-    while !shutdown {
-        if host_watchdog
-            .as_mut()
-            .is_some_and(HostWatchdog::host_is_gone)
-        {
-            break;
-        }
+    while !shutdown && !stop_requested.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((stream, _)) => {
                 shutdown = handle_connection(stream, &token, handlers)?;
@@ -94,12 +96,18 @@ pub fn run<H: CommandHandler>(
             Err(error) => return Err(error.into()),
         }
     }
+    stop_requested.store(true, Ordering::Release);
+    if let Some(watchdog) = watchdog {
+        let _ = watchdog.join();
+    }
     handlers.shutdown()?;
     Ok(())
 }
 
 // The detached worker cannot rely on OS child-process cleanup, so it watches
-// Pixcall's local API listener and shuts down after a short failure window.
+// Pixcall's local HTTP API in a separate thread and shuts down after a short
+// failure window. Keeping this outside the request loop means a long model
+// inference cannot prevent host-loss detection.
 struct HostWatchdog {
     port: u16,
     last_check: Instant,
@@ -119,19 +127,46 @@ impl HostWatchdog {
         }
     }
 
+    fn run(mut self, stop_requested: Arc<AtomicBool>) {
+        while !stop_requested.load(Ordering::Acquire) {
+            if self.host_is_gone() {
+                stop_requested.store(true, Ordering::Release);
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+
     fn host_is_gone(&mut self) -> bool {
         if self.last_check.elapsed() < Self::CHECK_INTERVAL {
             return false;
         }
         self.last_check = Instant::now();
         let address = SocketAddr::from((Ipv4Addr::LOCALHOST, self.port));
-        if TcpStream::connect_timeout(&address, Self::CONNECT_TIMEOUT).is_ok() {
+        if host_http_probe(address) {
             self.consecutive_failures = 0;
         } else {
             self.consecutive_failures = self.consecutive_failures.saturating_add(1);
         }
         self.consecutive_failures >= Self::FAILURE_LIMIT
     }
+}
+
+fn host_http_probe(address: SocketAddr) -> bool {
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, HostWatchdog::CONNECT_TIMEOUT) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(HostWatchdog::CONNECT_TIMEOUT));
+    let _ = stream.set_write_timeout(Some(HostWatchdog::CONNECT_TIMEOUT));
+    if stream
+        .write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .is_err()
+    {
+        return false;
+    }
+
+    let mut response = [0_u8; 64];
+    stream.read(&mut response).is_ok_and(|length| length > 0)
 }
 
 fn handle_connection<H: CommandHandler>(

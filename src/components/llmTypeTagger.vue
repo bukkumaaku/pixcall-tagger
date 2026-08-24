@@ -43,6 +43,7 @@
         getBackendClient,
         type BackendClient,
     } from "../services/backendClient";
+    import { PIXCALL_WORKER_CONNECTION_LOST } from "../services/pixcallBridge";
     import {
         beginTask,
         cancelTask,
@@ -50,6 +51,7 @@
         failTask,
         isTaskCancelled,
         recordFailure,
+        requestTaskCancel,
         updateTask,
         waitForTaskControl,
     } from "../services/taskCenter";
@@ -124,6 +126,7 @@ import {
     const isProcessing = ref(false);
     const activeTaskId = ref("");
     const processingStage = ref<ProcessingStage>("idle");
+    const workerConnectionLost = ref(false);
     const completedItems = ref(0);
     const totalItems = ref(0);
     const showDownload = ref(false);
@@ -347,8 +350,12 @@ import {
     });
 
     onMounted(initializePage);
+    onMounted(() => {
+        window.addEventListener(PIXCALL_WORKER_CONNECTION_LOST, handleWorkerConnectionLost);
+    });
     onBeforeUnmount(() => {
         if (saveTimer) clearTimeout(saveTimer);
+        window.removeEventListener(PIXCALL_WORKER_CONNECTION_LOST, handleWorkerConnectionLost);
         void persistForm();
     });
 
@@ -513,6 +520,12 @@ import {
             .unloadLlamafile(LLAMAFILE_SESSION_ID)
             .catch((error) => console.error("卸载 llamafile 失败", error));
     }
+
+    const handleWorkerConnectionLost = () => {
+        workerConnectionLost.value = true;
+        if (activeTaskId.value) requestTaskCancel(activeTaskId.value);
+        void unloadSession();
+    };
 
     const resolveImagePath = async (
         backend: BackendClient,
@@ -728,6 +741,7 @@ import {
             return;
         }
         isProcessing.value = true;
+        workerConnectionLost.value = false;
         activeTaskId.value = taskId;
         completedItems.value = 0;
         totalItems.value = items.length;
@@ -968,6 +982,11 @@ import {
                 });
             }
         } finally {
+            if (workerConnectionLost.value && !wasCancelled) {
+                wasCancelled = true;
+                cancellationError = new Error("Pixcall connection to ai-worker was lost");
+                cancelTask(taskId);
+            }
             isProcessing.value = false;
             activeTaskId.value = "";
             processingStage.value = wasCancelled ? "idle" : failures.length > 0 ? "failed" : "complete";

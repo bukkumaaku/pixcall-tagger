@@ -7,6 +7,8 @@ import { translate } from "./i18n";
 const WORKER_PORT = 22514;
 const WORKER_TOKEN = "pixcall-ai-tagger-v4";
 const WORKER_LOCK_NAME = "pixcall-ai-tagger-worker-startup";
+const WORKER_REQUEST_TIMEOUT_MS = 330_000;
+export const PIXCALL_WORKER_CONNECTION_LOST = "pixcall-worker-connection-lost";
 const LEGACY_WORKERS = [
     { port: 22513, token: "pixcall-ai-tagger-v3" },
     { port: 22512, token: "pixcall-ai-tagger-v2" },
@@ -269,44 +271,58 @@ export async function workerRequest<K extends CommandType>(
     onMessage?: (message: WorkerMessage) => void,
 ): Promise<WorkerMessage[]> {
     await ensureWorker();
-    const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/request-stream`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-Pixcall-AI-Token": WORKER_TOKEN,
-        },
-        body: JSON.stringify(request),
-    });
-    if (!response.ok) throw new Error(`ai-worker HTTP ${response.status}: ${await response.text()}`);
-    if (!response.body) throw new Error("ai-worker HTTP response has no body");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), WORKER_REQUEST_TIMEOUT_MS);
+    try {
+        const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/request-stream`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Pixcall-AI-Token": WORKER_TOKEN,
+            },
+            body: JSON.stringify(request),
+            signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`ai-worker HTTP ${response.status}: ${await response.text()}`);
+        if (!response.body) throw new Error("ai-worker HTTP response has no body");
 
-    const messages: WorkerMessage[] = [];
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-        const { value, done } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        let newline = buffer.indexOf("\n");
-        while (newline >= 0) {
-            const line = buffer.slice(0, newline).trim();
-            buffer = buffer.slice(newline + 1);
-            if (line) {
-                const message = JSON.parse(line) as WorkerMessage;
-                messages.push(message);
-                onMessage?.(message);
+        const messages: WorkerMessage[] = [];
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+            const { value, done } = await reader.read();
+            buffer += decoder.decode(value, { stream: !done });
+            let newline = buffer.indexOf("\n");
+            while (newline >= 0) {
+                const line = buffer.slice(0, newline).trim();
+                buffer = buffer.slice(newline + 1);
+                if (line) {
+                    const message = JSON.parse(line) as WorkerMessage;
+                    onMessage?.(message);
+                    if (message.type !== "progress") messages.push(message);
+                }
+                newline = buffer.indexOf("\n");
             }
-            newline = buffer.indexOf("\n");
+            if (done) break;
         }
-        if (done) break;
+        const tail = buffer.trim();
+        if (tail) {
+            const message = JSON.parse(tail) as WorkerMessage;
+            onMessage?.(message);
+            if (message.type !== "progress") messages.push(message);
+        }
+        return messages;
+    } catch (error) {
+        void shutdownWorker();
+        window.dispatchEvent(new CustomEvent(PIXCALL_WORKER_CONNECTION_LOST, { detail: { error } }));
+        if (controller.signal.aborted) {
+            throw new Error("ai-worker request timed out; the task was cancelled");
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
     }
-    const tail = buffer.trim();
-    if (tail) {
-        const message = JSON.parse(tail) as WorkerMessage;
-        messages.push(message);
-        onMessage?.(message);
-    }
-    return messages;
 }
 
 export async function shutdownWorker() {
