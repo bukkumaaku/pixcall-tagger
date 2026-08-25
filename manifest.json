@@ -2,7 +2,7 @@
   "id": "ai-tagger",
   "name": "AI 自动标签",
   "description": "使用本地 WD、视觉语言和向量模型为 Pixcall 素材打标签、生成注释并进行语义搜索。",
-  "version": "2.2.4",
+  "version": "2.2.5",
   "author": "kankan",
   "homepage": "https://github.com/bukkumaaku/pixcall-tagger",
   "icon": "icon.png",
