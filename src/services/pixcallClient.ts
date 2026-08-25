@@ -50,6 +50,8 @@ export type PixcallItem = {
 
 class PixcallClient {
     private entries = new Map<string, PixcallEntry>();
+    private entryPaths = new Map<string, string>();
+    private pendingEntryPaths = new Map<string, Promise<string>>();
     private tagById = new Map<string, string>();
     private tagByName = new Map<string, string>();
     private tagCreationQueue: Promise<void> = Promise.resolve();
@@ -232,19 +234,43 @@ class PixcallClient {
     }
 
     private async resolveEntryPath(entry: PixcallEntry) {
-        if (entry.source_path) return normalizeLocalPath(entry.source_path);
-        const result = await this.request<unknown>({
-            type: "get_entry_path",
-            id: normalizeId(entry.id),
-        });
-        if (typeof result === "string") return normalizeLocalPath(result);
-        if (result && typeof result === "object") {
-            const record = result as Record<string, unknown>;
-            for (const key of ["path", "file_path", "filePath", "source_path"]) {
-                if (typeof record[key] === "string") return normalizeLocalPath(record[key] as string);
-            }
+        const id = normalizeId(entry.id);
+        if (entry.source_path) {
+            const path = normalizeLocalPath(entry.source_path);
+            this.entryPaths.set(id, path);
+            return path;
         }
-        throw new Error(translate("pixcall.item_path_missing", { name: entry.name || entry.id }));
+        const cached = this.entryPaths.get(id);
+        if (cached) return cached;
+        const pending = this.pendingEntryPaths.get(id);
+        if (pending) return pending;
+        const request = (async () => {
+            const result = await this.request<unknown>({
+                type: "get_entry_path",
+                id,
+            });
+            let path = "";
+            if (typeof result === "string") {
+                path = normalizeLocalPath(result);
+            } else if (result && typeof result === "object") {
+                const record = result as Record<string, unknown>;
+                for (const key of ["path", "file_path", "filePath", "source_path"]) {
+                    if (typeof record[key] === "string") {
+                        path = normalizeLocalPath(record[key] as string);
+                        break;
+                    }
+                }
+            }
+            if (!path) throw new Error(translate("pixcall.item_path_missing", { name: entry.name || entry.id }));
+            this.entryPaths.set(id, path);
+            return path;
+        })();
+        this.pendingEntryPaths.set(id, request);
+        try {
+            return await request;
+        } finally {
+            if (this.pendingEntryPaths.get(id) === request) this.pendingEntryPaths.delete(id);
+        }
     }
 
     private async ensureTags() {

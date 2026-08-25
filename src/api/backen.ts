@@ -50,6 +50,7 @@ export const t = ref((key: string, params?: TranslationParams) =>
 );
 export const convertPath = resolveResourcePath;
 let configWriteQueue: Promise<void> = Promise.resolve();
+let configReadRequest: Promise<Config> | null = null;
 
 export const backenAPI = {
     get is_processing() {
@@ -57,11 +58,19 @@ export const backenAPI = {
     },
     async getConfig() {
         await configWriteQueue;
-        const result = await getBackendClient().readConfig();
-        config = result.config;
-        configLoaded.value = true;
-        configRevision.value++;
-        return config;
+        if (configReadRequest) return configReadRequest;
+        const request = getBackendClient().readConfig().then((result) => {
+            config = result.config;
+            configLoaded.value = true;
+            configRevision.value++;
+            return config;
+        });
+        configReadRequest = request;
+        try {
+            return await request;
+        } finally {
+            if (configReadRequest === request) configReadRequest = null;
+        }
     },
 
     setConfig() {

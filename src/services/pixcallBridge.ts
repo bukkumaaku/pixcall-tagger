@@ -9,7 +9,7 @@ const WORKER_TOKEN = "pixcall-ai-tagger-v4";
 const WORKER_LOCK_NAME = "pixcall-ai-tagger-worker-startup";
 const WORKER_REQUEST_TIMEOUT_MS = 330_000;
 const PIXCALL_REQUEST_TIMEOUT_MS = 5000;
-const PIXCALL_RETRY_DELAYS_MS = [200, 500, 1000, 2000];
+const PIXCALL_RETRY_DELAYS_MS = [250, 750];
 const WORKER_HEALTH_TIMEOUT_MS = 500;
 const RETRYABLE_PIXCALL_REQUESTS = new Set([
     "get_settings",
@@ -26,9 +26,22 @@ const LEGACY_WORKERS = [
     { port: 22511, token: "pixcall-ai-tagger-v1" },
 ];
 let pixcallBaseUrl = "";
+let pixcallBaseUrlPromise: Promise<string> | null = null;
 let workerReady: Promise<void> | null = null;
 let shutdownRequested = false;
+let shutdownRequest: Promise<void> | null = null;
 let startupLogLines: string[] = [];
+const inflightPixcallRequests = new Map<string, Promise<unknown>>();
+
+export class PixcallRequestTimeoutError extends Error {
+    readonly timeoutMs: number;
+
+    constructor(timeoutMs: number) {
+        super(`Pixcall API request timed out after ${timeoutMs / 1000} seconds`);
+        this.name = "PixcallRequestTimeoutError";
+        this.timeoutMs = timeoutMs;
+    }
+}
 
 function logWorkerStartup(startedAt: number, message: string) {
     const line = `+${(performance.now() - startedAt).toFixed(1)}ms ${message}`;
@@ -86,41 +99,115 @@ async function pixcallSend<T>(endpoint: string, payload: Record<string, unknown>
     const retryable = endpoint === "request" &&
         typeof payload.type === "string" &&
         RETRYABLE_PIXCALL_REQUESTS.has(payload.type);
+    const key = retryable ? requestKey(endpoint, payload) : "";
+    if (key) {
+        const existing = inflightPixcallRequests.get(key);
+        if (existing) return existing as Promise<T>;
+        const request = sendPixcallRequest<T>(endpoint, payload, retryable);
+        inflightPixcallRequests.set(key, request);
+        try {
+            return await request;
+        } finally {
+            if (inflightPixcallRequests.get(key) === request) {
+                inflightPixcallRequests.delete(key);
+            }
+        }
+    }
+    return sendPixcallRequest<T>(endpoint, payload, retryable);
+}
+
+function requestKey(endpoint: string, payload: Record<string, unknown>) {
+    try {
+        return `${endpoint}:${JSON.stringify(payload)}`;
+    } catch {
+        return "";
+    }
+}
+
+function isAbortError(error: unknown) {
+    return error instanceof Error && error.name === "AbortError";
+}
+
+async function fetchWithTimeout(
+    input: RequestInfo | URL,
+    init: RequestInit,
+    timeoutMs: number,
+    consume: (response: Response) => Promise<unknown>,
+) {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, timeoutMs);
+    try {
+        const response = await fetch(input, { ...init, signal: controller.signal });
+        return await consume(response);
+    } catch (error) {
+        if (timedOut) throw new PixcallRequestTimeoutError(timeoutMs);
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function ensurePixcallBaseUrl() {
+    if (pixcallBaseUrl) return pixcallBaseUrl;
+    const pending = pixcallBaseUrlPromise ??= (async () => {
+        const context = await getPixcallContext<unknown>("serverPort");
+        const port = typeof context === "number"
+            ? context
+            : context && typeof context === "object" && "port" in context
+                ? Number((context as { port?: unknown }).port)
+                : Number(context);
+        return `http://127.0.0.1:${Number.isFinite(port) && port > 0 ? port : 22510}`;
+    })();
+    try {
+        pixcallBaseUrl ||= await pending;
+        return pixcallBaseUrl;
+    } finally {
+        if (pixcallBaseUrlPromise === pending) pixcallBaseUrlPromise = null;
+    }
+}
+
+async function sendPixcallRequest<T>(
+    endpoint: string,
+    payload: Record<string, unknown>,
+    retryable: boolean,
+): Promise<T> {
     const attempts = retryable ? PIXCALL_RETRY_DELAYS_MS.length + 1 : 1;
     let lastError: unknown;
     for (let attempt = 0; attempt < attempts; attempt++) {
-        if (!pixcallBaseUrl) {
-            const context = await getPixcallContext<unknown>("serverPort");
-            const port = typeof context === "number"
-                ? context
-                : context && typeof context === "object" && "port" in context
-                    ? Number((context as { port?: unknown }).port)
-                    : Number(context);
-            pixcallBaseUrl = `http://127.0.0.1:${Number.isFinite(port) && port > 0 ? port : 22510}`;
-        }
-        let response: Response;
+        const baseUrl = await ensurePixcallBaseUrl();
+        let result: { response: Response; text: string };
         try {
-            response = await fetch(`${pixcallBaseUrl}/${endpoint}`, {
+            result = await fetchWithTimeout(`${baseUrl}/${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify(payload),
-                signal: AbortSignal.timeout(PIXCALL_REQUEST_TIMEOUT_MS),
-            });
+            }, PIXCALL_REQUEST_TIMEOUT_MS, async (response) => ({
+                response,
+                text: await response.text(),
+            })) as { response: Response; text: string };
         } catch (error) {
             lastError = error;
+            // A timed-out request may still be running inside Pixcall. Retrying
+            // it queues duplicate work on the host and can freeze Pixcall.
+            if (error instanceof PixcallRequestTimeoutError || isAbortError(error)) {
+                throw error;
+            }
             pixcallBaseUrl = "";
             if (attempt + 1 >= attempts) throw error;
             await new Promise((resolve) => setTimeout(resolve, PIXCALL_RETRY_DELAYS_MS[attempt]));
             continue;
         }
-        if (!response.ok) {
-            const message = `Pixcall API ${response.status}: ${await response.text()}`;
-            if (response.status < 500 || attempt + 1 >= attempts) throw new Error(message);
+        if (!result.response.ok) {
+            const message = `Pixcall API ${result.response.status}: ${result.text}`;
+            if (result.response.status < 500 || attempt + 1 >= attempts) throw new Error(message);
             lastError = new Error(message);
             pixcallBaseUrl = "";
         } else {
-            const text = await response.text();
-            return (text ? JSON.parse(text) : null) as T;
+            return (result.text ? JSON.parse(result.text) : null) as T;
         }
         await new Promise((resolve) => setTimeout(resolve, PIXCALL_RETRY_DELAYS_MS[attempt]));
     }
@@ -435,9 +522,16 @@ export async function shutdownWorker() {
     if (shutdownRequested) return;
     shutdownRequested = true;
     workerReady = null;
-    await fetch(`http://127.0.0.1:${WORKER_PORT}/shutdown`, {
+    shutdownRequest ??= fetchWithTimeout(`http://127.0.0.1:${WORKER_PORT}/shutdown`, {
         method: "POST",
         headers: { "X-Pixcall-AI-Token": WORKER_TOKEN },
         keepalive: true,
-    }).catch(() => undefined);
+    }, 1000, async (response) => {
+        await response.text();
+    }).then(() => undefined).catch(() => undefined);
+    try {
+        await shutdownRequest;
+    } finally {
+        shutdownRequest = null;
+    }
 }
