@@ -23,6 +23,7 @@ import {
     type WdModelKind,
     type WdTaggerImage,
     type WdTagLanguage,
+    type WorkerMessage,
     type WdTaggerLoadResult,
     type WdTaggerBatchCompleteResult,
     type WdTaggerEnqueueResult,
@@ -441,11 +442,19 @@ export class BackendClient {
         this.start();
         const requestId = `r-${Date.now()}-${++this.sequence}`;
         const request = createRequest(requestId, type, payload);
-        const messages = await workerRequest(request, (message) => {
+        const receive = (message: WorkerMessage) => {
             if (message.protocolVersion === PROTOCOL_VERSION && message.type === "progress") {
                 onProgress?.(message.payload);
             }
-        });
+        };
+        let messages: WorkerMessage[];
+        try {
+            messages = await workerRequest(request, receive);
+        } catch (error) {
+            if (type !== "read_config") throw error;
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            messages = await workerRequest(request, receive);
+        }
         for (const message of messages) {
             if (message.protocolVersion !== PROTOCOL_VERSION) continue;
             if (message.type === "progress") {

@@ -16,6 +16,7 @@ use thiserror::Error;
 use crate::{
     dispatch,
     handlers::{CommandHandler, EventEmitter, HandlerError, HandlerResult},
+    startup_log,
 };
 
 #[derive(Debug, Error)]
@@ -75,15 +76,27 @@ pub fn run<H: CommandHandler>(
     port: u16,
     token: String,
     host_port: Option<u16>,
+    started_at: Instant,
     handlers: &mut H,
 ) -> Result<(), HttpServerError> {
+    startup_log(started_at, format!("http.bind.begin port={port}"));
     let listener = TcpListener::bind(("127.0.0.1", port))?;
+    startup_log(started_at, format!("http.listener_bound port={port}"));
     listener.set_nonblocking(host_port.is_some())?;
     let stop_requested = Arc::new(AtomicBool::new(false));
     let watchdog = host_port.map(|port| {
         let stop_requested = Arc::clone(&stop_requested);
         thread::spawn(move || HostWatchdog::new(port).run(stop_requested))
     });
+    startup_log(
+        started_at,
+        if host_port.is_some() {
+            "http.watchdog_started"
+        } else {
+            "http.watchdog_disabled"
+        },
+    );
+    startup_log(started_at, "http.ready");
     let mut shutdown = false;
     while !shutdown && !stop_requested.load(Ordering::Acquire) {
         match listener.accept() {
@@ -194,7 +207,7 @@ fn handle_connection<H: CommandHandler>(
         write_json(
             &mut stream,
             200,
-            &serde_json::json!({ "ok": true, "streaming": true }),
+            &serde_json::json!({ "ok": true, "streaming": true, "startupLog": true }),
         )?;
         return Ok(false);
     }
@@ -209,6 +222,14 @@ fn handle_connection<H: CommandHandler>(
     if request.path == "/shutdown" {
         write_json(&mut stream, 200, &serde_json::json!({ "ok": true }))?;
         return Ok(true);
+    }
+    if request.method == "POST" && request.path == "/startup-log" {
+        let content = String::from_utf8_lossy(&request.body);
+        for line in content.lines().filter(|line| !line.trim().is_empty()) {
+            crate::append_startup_log(format!("frontend {line}"));
+        }
+        write_json(&mut stream, 200, &serde_json::json!({ "ok": true }))?;
+        return Ok(false);
     }
     if request.method == "POST" && request.path == "/request-stream" {
         write_stream_headers(&mut stream)?;

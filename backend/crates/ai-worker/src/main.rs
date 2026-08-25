@@ -1,11 +1,15 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+use std::time::Instant;
+
 fn main() -> Result<(), ai_worker::WorkerError> {
+    let started_at = Instant::now();
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if !args
         .iter()
         .any(|argument| argument == "--http" || argument == "--detach-http")
     {
+        ai_worker::startup_log(started_at, "process.start mode=stdio");
         return ai_worker::run_stdio();
     }
 
@@ -21,9 +25,17 @@ fn main() -> Result<(), ai_worker::WorkerError> {
         .transpose()
         .map_err(|error| ai_worker::WorkerError::Arguments(error.to_string()))?;
     if args.iter().any(|argument| argument == "--detach-http") {
-        ai_worker::spawn_detached_http(port, token, host_port)
+        ai_worker::startup_log(
+            started_at,
+            format!("process.start mode=detach-http port={port} host_port={host_port:?}"),
+        );
+        ai_worker::spawn_detached_http(port, token, host_port, started_at)
     } else {
-        ai_worker::run_http(port, token, host_port)
+        ai_worker::startup_log(
+            started_at,
+            format!("process.start mode=http port={port} host_port={host_port:?}"),
+        );
+        ai_worker::run_http(port, token, host_port, started_at)
     }
 }
 
