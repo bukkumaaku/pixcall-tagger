@@ -129,8 +129,10 @@ struct HostWatchdog {
 
 impl HostWatchdog {
     const CHECK_INTERVAL: Duration = Duration::from_secs(2);
-    const CONNECT_TIMEOUT: Duration = Duration::from_millis(500);
-    const FAILURE_LIMIT: u8 = 3;
+    // The host port is used only as a process-liveness signal. Give the host
+    // enough time to accept a connection while it is busy with UI work.
+    const CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
+    const FAILURE_LIMIT: u8 = 5;
 
     fn new(port: u16) -> Self {
         Self {
@@ -156,30 +158,13 @@ impl HostWatchdog {
         }
         self.last_check = Instant::now();
         let address = SocketAddr::from((Ipv4Addr::LOCALHOST, self.port));
-        if host_http_probe(address) {
+        if TcpStream::connect_timeout(&address, Self::CONNECT_TIMEOUT).is_ok() {
             self.consecutive_failures = 0;
         } else {
             self.consecutive_failures = self.consecutive_failures.saturating_add(1);
         }
         self.consecutive_failures >= Self::FAILURE_LIMIT
     }
-}
-
-fn host_http_probe(address: SocketAddr) -> bool {
-    let Ok(mut stream) = TcpStream::connect_timeout(&address, HostWatchdog::CONNECT_TIMEOUT) else {
-        return false;
-    };
-    let _ = stream.set_read_timeout(Some(HostWatchdog::CONNECT_TIMEOUT));
-    let _ = stream.set_write_timeout(Some(HostWatchdog::CONNECT_TIMEOUT));
-    if stream
-        .write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
-        .is_err()
-    {
-        return false;
-    }
-
-    let mut response = [0_u8; 64];
-    stream.read(&mut response).is_ok_and(|length| length > 0)
 }
 
 fn handle_connection<H: CommandHandler>(
@@ -376,4 +361,20 @@ fn write_response(
     stream.write_all(body)?;
     stream.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn watchdog_keeps_a_host_that_accepts_tcp_connections_without_http_responses() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let mut watchdog = HostWatchdog::new(listener.local_addr().unwrap().port());
+
+        for _ in 0..HostWatchdog::FAILURE_LIMIT {
+            watchdog.last_check = Instant::now() - HostWatchdog::CHECK_INTERVAL;
+            assert!(!watchdog.host_is_gone());
+        }
+    }
 }

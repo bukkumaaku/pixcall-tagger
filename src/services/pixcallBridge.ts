@@ -325,6 +325,11 @@ async function startWorker() {
     const log = (message: string) => logWorkerStartup(startedAt, message);
     log("startup begin");
 
+    // A connection-loss handler may still be finishing the old worker's
+    // shutdown request. Wait for it before spawning or reusing a worker, or
+    // the old request can terminate the newly started process.
+    const pendingShutdown = shutdownRequest;
+    if (pendingShutdown) await pendingShutdown;
     shutdownRequested = false;
     void shutdownLegacyWorkers().catch(() => undefined);
     log("legacy worker cleanup scheduled in background");
@@ -466,16 +471,23 @@ export async function workerRequest<K extends CommandType>(
     await ensureWorker();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), WORKER_REQUEST_TIMEOUT_MS);
+    let connectionLost = false;
     try {
-        const response = await fetch(`http://127.0.0.1:${WORKER_PORT}/request-stream`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Pixcall-AI-Token": WORKER_TOKEN,
-            },
-            body: JSON.stringify(request),
-            signal: controller.signal,
-        });
+        let response: Response;
+        try {
+            response = await fetch(`http://127.0.0.1:${WORKER_PORT}/request-stream`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Pixcall-AI-Token": WORKER_TOKEN,
+                },
+                body: JSON.stringify(request),
+                signal: controller.signal,
+            });
+        } catch (error) {
+            connectionLost = true;
+            throw error;
+        }
         if (!response.ok) throw new Error(`ai-worker HTTP ${response.status}: ${await response.text()}`);
         if (!response.body) throw new Error("ai-worker HTTP response has no body");
 
@@ -484,7 +496,14 @@ export async function workerRequest<K extends CommandType>(
         const decoder = new TextDecoder();
         let buffer = "";
         while (true) {
-            const { value, done } = await reader.read();
+            let chunk: ReadableStreamReadResult<Uint8Array>;
+            try {
+                chunk = await reader.read();
+            } catch (error) {
+                connectionLost = true;
+                throw error;
+            }
+            const { value, done } = chunk;
             buffer += decoder.decode(value, { stream: !done });
             let newline = buffer.indexOf("\n");
             while (newline >= 0) {
@@ -507,8 +526,10 @@ export async function workerRequest<K extends CommandType>(
         }
         return messages;
     } catch (error) {
-        void shutdownWorker();
-        window.dispatchEvent(new CustomEvent(PIXCALL_WORKER_CONNECTION_LOST, { detail: { error } }));
+        if (connectionLost || controller.signal.aborted) {
+            void shutdownWorker();
+            window.dispatchEvent(new CustomEvent(PIXCALL_WORKER_CONNECTION_LOST, { detail: { error } }));
+        }
         if (controller.signal.aborted) {
             throw new Error("ai-worker request timed out; the task was cancelled");
         }
