@@ -78,9 +78,9 @@ pub fn run_http(
     started_at: Instant,
 ) -> Result<(), WorkerError> {
     startup_log(started_at, "http.handlers_init.begin");
-    let mut handlers = BuiltinHandlers::default();
+    let handlers = BuiltinHandlers::default();
     startup_log(started_at, "http.handlers_init.done");
-    http::run(port, token, host_port, started_at, &mut handlers)?;
+    http::run(port, token, host_port, started_at, handlers)?;
     Ok(())
 }
 

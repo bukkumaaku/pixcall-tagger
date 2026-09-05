@@ -4,8 +4,9 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
+        Mutex,
     },
-    thread,
+    thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
 
@@ -29,6 +30,9 @@ pub enum HttpServerError {
 
     #[error("worker shutdown failed: {0}")]
     Shutdown(#[from] HandlerError),
+
+    #[error("HTTP worker handler lock poisoned")]
+    HandlerLockPoisoned,
 }
 
 #[derive(Serialize)]
@@ -72,17 +76,17 @@ struct HttpRequest {
     body: Vec<u8>,
 }
 
-pub fn run<H: CommandHandler>(
+pub fn run<H: CommandHandler + Send + 'static>(
     port: u16,
     token: String,
     host_port: Option<u16>,
     started_at: Instant,
-    handlers: &mut H,
+    handlers: H,
 ) -> Result<(), HttpServerError> {
     startup_log(started_at, format!("http.bind.begin port={port}"));
     let listener = TcpListener::bind(("127.0.0.1", port))?;
     startup_log(started_at, format!("http.listener_bound port={port}"));
-    listener.set_nonblocking(host_port.is_some())?;
+    listener.set_nonblocking(true)?;
     let stop_requested = Arc::new(AtomicBool::new(false));
     let watchdog = host_port.map(|port| {
         let stop_requested = Arc::clone(&stop_requested);
@@ -97,24 +101,69 @@ pub fn run<H: CommandHandler>(
         },
     );
     startup_log(started_at, "http.ready");
-    let mut shutdown = false;
-    while !shutdown && !stop_requested.load(Ordering::Acquire) {
+    let handlers = Arc::new(Mutex::new(handlers));
+    let expected_token = Arc::new(token);
+    let mut connections = Vec::new();
+    while !stop_requested.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((stream, _)) => {
-                shutdown = handle_connection(stream, &token, handlers)?;
+                let handlers = Arc::clone(&handlers);
+                let expected_token = Arc::clone(&expected_token);
+                let stop_requested = Arc::clone(&stop_requested);
+                connections.push(thread::spawn(move || {
+                    if let Err(error) = handle_connection(
+                        stream,
+                        expected_token.as_str(),
+                        &handlers,
+                        &stop_requested,
+                    ) {
+                        eprintln!("[ai-worker] HTTP connection failed: {error}");
+                    }
+                }));
+                reap_finished_connections(&mut connections);
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                reap_finished_connections(&mut connections);
                 thread::sleep(Duration::from_millis(100));
             }
-            Err(error) => return Err(error.into()),
+            Err(error) => {
+                stop_requested.store(true, Ordering::Release);
+                join_connections(&mut connections);
+                if let Some(watchdog) = watchdog {
+                    let _ = watchdog.join();
+                }
+                return Err(error.into());
+            }
         }
     }
     stop_requested.store(true, Ordering::Release);
+    join_connections(&mut connections);
     if let Some(watchdog) = watchdog {
         let _ = watchdog.join();
     }
+    let mut handlers = handlers
+        .lock()
+        .map_err(|_| HttpServerError::HandlerLockPoisoned)?;
     handlers.shutdown()?;
     Ok(())
+}
+
+fn reap_finished_connections(connections: &mut Vec<JoinHandle<()>>) {
+    let mut active = Vec::with_capacity(connections.len());
+    for connection in connections.drain(..) {
+        if connection.is_finished() {
+            let _ = connection.join();
+        } else {
+            active.push(connection);
+        }
+    }
+    *connections = active;
+}
+
+fn join_connections(connections: &mut Vec<JoinHandle<()>>) {
+    for connection in connections.drain(..) {
+        let _ = connection.join();
+    }
 }
 
 // The detached worker cannot rely on OS child-process cleanup, so it watches
@@ -170,8 +219,13 @@ impl HostWatchdog {
 fn handle_connection<H: CommandHandler>(
     mut stream: TcpStream,
     expected_token: &str,
-    handlers: &mut H,
-) -> Result<bool, HttpServerError> {
+    handlers: &Mutex<H>,
+    stop_requested: &AtomicBool,
+) -> Result<(), HttpServerError> {
+    // Bound socket I/O, not model execution. Idle clients must not retain
+    // connection threads forever or prevent shutdown.
+    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(5)))?;
     let request = match read_request(&stream) {
         Ok(request) => request,
         Err(error) => {
@@ -180,13 +234,13 @@ fn handle_connection<H: CommandHandler>(
                 400,
                 &serde_json::json!({ "error": error.to_string() }),
             )?;
-            return Ok(false);
+            return Ok(());
         }
     };
 
     if request.method == "OPTIONS" {
         write_empty(&mut stream, 204)?;
-        return Ok(false);
+        return Ok(());
     }
     if request.path == "/health" {
         write_json(
@@ -194,7 +248,7 @@ fn handle_connection<H: CommandHandler>(
             200,
             &serde_json::json!({ "ok": true, "streaming": true, "startupLog": true }),
         )?;
-        return Ok(false);
+        return Ok(());
     }
     if request.token != expected_token {
         write_json(
@@ -202,11 +256,12 @@ fn handle_connection<H: CommandHandler>(
             401,
             &serde_json::json!({ "error": "unauthorized" }),
         )?;
-        return Ok(false);
+        return Ok(());
     }
     if request.path == "/shutdown" {
+        stop_requested.store(true, Ordering::Release);
         write_json(&mut stream, 200, &serde_json::json!({ "ok": true }))?;
-        return Ok(true);
+        return Ok(());
     }
     if request.method == "POST" && request.path == "/startup-log" {
         let content = String::from_utf8_lossy(&request.body);
@@ -214,7 +269,7 @@ fn handle_connection<H: CommandHandler>(
             crate::append_startup_log(format!("frontend {line}"));
         }
         write_json(&mut stream, 200, &serde_json::json!({ "ok": true }))?;
-        return Ok(false);
+        return Ok(());
     }
     if request.method == "POST" && request.path == "/request-stream" {
         write_stream_headers(&mut stream)?;
@@ -225,7 +280,13 @@ fn handle_connection<H: CommandHandler>(
                     request_id,
                     stream: &mut stream,
                 };
-                dispatch::dispatch(request, handlers, &mut events)
+                let mut handlers = handlers
+                    .lock()
+                    .map_err(|_| HttpServerError::HandlerLockPoisoned)?;
+                if stop_requested.load(Ordering::Acquire) {
+                    return Ok(());
+                }
+                dispatch::dispatch(request, &mut *handlers, &mut events)
             }
             Err(error) => Response::error(
                 None,
@@ -234,7 +295,7 @@ fn handle_connection<H: CommandHandler>(
             ),
         };
         write_ndjson(&mut stream, &response)?;
-        return Ok(false);
+        return Ok(());
     }
     if request.method != "POST" || request.path != "/request" {
         write_json(
@@ -242,7 +303,7 @@ fn handle_connection<H: CommandHandler>(
             404,
             &serde_json::json!({ "error": "not found" }),
         )?;
-        return Ok(false);
+        return Ok(());
     }
 
     let parsed = serde_json::from_slice::<Request>(&request.body);
@@ -254,7 +315,13 @@ fn handle_connection<H: CommandHandler>(
                 request_id,
                 messages: Vec::new(),
             };
-            let response = dispatch::dispatch(request, handlers, &mut events);
+            let mut handlers = handlers
+                .lock()
+                .map_err(|_| HttpServerError::HandlerLockPoisoned)?;
+            if stop_requested.load(Ordering::Acquire) {
+                return Ok(());
+            }
+            let response = dispatch::dispatch(request, &mut *handlers, &mut events);
             messages.append(&mut events.messages);
             messages.push(response);
         }
@@ -265,7 +332,7 @@ fn handle_connection<H: CommandHandler>(
         )),
     }
     write_json(&mut stream, 200, &MessageEnvelope { messages })?;
-    Ok(false)
+    Ok(())
 }
 
 fn write_stream_headers(stream: &mut TcpStream) -> Result<(), HttpServerError> {

@@ -53,7 +53,12 @@ import {
     type EmbeddingUnloadResult,
     createRequest,
 } from "../protocol";
-import { ensureWorker, shutdownWorker, workerRequest } from "./pixcallBridge";
+import {
+    ensureWorker,
+    PIXCALL_WORKER_CONNECTION_LOST,
+    shutdownWorker,
+    workerRequest,
+} from "./pixcallBridge";
 
 export class BackendClientError extends Error {
     readonly code: string;
@@ -76,6 +81,16 @@ export class BackendClient {
     private generation = 0;
     private running = false;
 
+    constructor() {
+        if (typeof window !== "undefined") {
+            window.addEventListener(PIXCALL_WORKER_CONNECTION_LOST, this.handleWorkerConnectionLost);
+        }
+    }
+
+    private handleWorkerConnectionLost = () => {
+        this.running = false;
+    };
+
     get path() {
         return "http://127.0.0.1:22514";
     }
@@ -91,7 +106,9 @@ export class BackendClient {
     start(options: { rethrow?: boolean } = {}): Promise<void> {
         if (this.running) return Promise.resolve();
         this.running = true;
-        return ensureWorker().catch((error) => {
+        return ensureWorker().then(() => {
+            this.generation++;
+        }).catch((error) => {
             this.running = false;
             console.error("Failed to start ai-worker", error);
             if (options.rethrow) throw error;

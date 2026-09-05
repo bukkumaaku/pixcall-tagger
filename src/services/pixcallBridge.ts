@@ -7,7 +7,6 @@ import { translate } from "./i18n";
 const WORKER_PORT = 22514;
 const WORKER_TOKEN = "pixcall-ai-tagger-v4";
 const WORKER_LOCK_NAME = "pixcall-ai-tagger-worker-startup";
-const WORKER_REQUEST_TIMEOUT_MS = 330_000;
 const PIXCALL_REQUEST_TIMEOUT_MS = 5000;
 const PIXCALL_RETRY_DELAYS_MS = [250, 750];
 const WORKER_HEALTH_TIMEOUT_MS = 500;
@@ -302,11 +301,11 @@ export async function pluginRootPath() {
 }
 
 export async function ensureWorker() {
-    workerReady ??= withWorkerStartupLock(startWorker);
+    const pending = workerReady ??= withWorkerStartupLock(startWorker);
     try {
-        await workerReady;
+        await pending;
     } catch (error) {
-        workerReady = null;
+        if (workerReady === pending) workerReady = null;
         throw error;
     }
 }
@@ -325,8 +324,8 @@ async function startWorker() {
     const log = (message: string) => logWorkerStartup(startedAt, message);
     log("startup begin");
 
-    // A connection-loss handler may still be finishing the old worker's
-    // shutdown request. Wait for it before spawning or reusing a worker, or
+    // An explicit shutdown may still be finishing its HTTP request. Wait for
+    // it before spawning or reusing a worker, or
     // the old request can terminate the newly started process.
     const pendingShutdown = shutdownRequest;
     if (pendingShutdown) await pendingShutdown;
@@ -469,9 +468,11 @@ export async function workerRequest<K extends CommandType>(
     onMessage?: (message: WorkerMessage) => void,
 ): Promise<WorkerMessage[]> {
     await ensureWorker();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), WORKER_REQUEST_TIMEOUT_MS);
+    const activeWorker = workerReady;
+    // A batch can outlast any individual model/API timeout. Let the transport
+    // report disconnections instead of aborting healthy long-running work.
     let connectionLost = false;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
         let response: Response;
         try {
@@ -482,17 +483,19 @@ export async function workerRequest<K extends CommandType>(
                     "X-Pixcall-AI-Token": WORKER_TOKEN,
                 },
                 body: JSON.stringify(request),
-                signal: controller.signal,
             });
         } catch (error) {
             connectionLost = true;
             throw error;
         }
         if (!response.ok) throw new Error(`ai-worker HTTP ${response.status}: ${await response.text()}`);
-        if (!response.body) throw new Error("ai-worker HTTP response has no body");
+        if (!response.body) {
+            connectionLost = true;
+            throw new Error("ai-worker HTTP response has no body");
+        }
 
         const messages: WorkerMessage[] = [];
-        const reader = response.body.getReader();
+        reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         while (true) {
@@ -524,18 +527,22 @@ export async function workerRequest<K extends CommandType>(
             onMessage?.(message);
             if (message.type !== "progress") messages.push(message);
         }
+        if (!messages.length) {
+            connectionLost = true;
+            throw new Error("ai-worker stream ended before the response");
+        }
         return messages;
     } catch (error) {
-        if (connectionLost || controller.signal.aborted) {
-            void shutdownWorker();
+        if (connectionLost && workerReady === activeWorker) {
+            workerReady = null;
             window.dispatchEvent(new CustomEvent(PIXCALL_WORKER_CONNECTION_LOST, { detail: { error } }));
-        }
-        if (controller.signal.aborted) {
-            throw new Error("ai-worker request timed out; the task was cancelled");
         }
         throw error;
     } finally {
-        clearTimeout(timeout);
+        if (reader) {
+            await reader.cancel().catch(() => undefined);
+            reader.releaseLock();
+        }
     }
 }
 
